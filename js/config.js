@@ -8,12 +8,12 @@
  *     (웹 앱 설정값은 원래 브라우저에 공개되는 값이라 커밋해도 됩니다. 보안은 firestore.rules 가 지킵니다.)
  */
 export const FIREBASE_CONFIG = {
-  apiKey: '',
-  authDomain: '',
-  projectId: '',
-  storageBucket: '',
-  messagingSenderId: '',
-  appId: ''
+  apiKey: 'AIzaSyDC7ID4V9hsRu08RwPPIhK7nUWPxvLdR0I',
+  authDomain: 'challenge-manage.firebaseapp.com',
+  projectId: 'challenge-manage',
+  storageBucket: 'challenge-manage.firebasestorage.app',
+  messagingSenderId: '762786706336',
+  appId: '1:762786706336:web:bfac2cb454948db317eac5'
 };
 
 export const APP = {
