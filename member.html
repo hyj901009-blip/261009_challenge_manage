@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="css/style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✍️</text></svg>">
 </head>
-<body>
+<body class="member-page">
   <header class="top">
     <div class="top-in">
       <h1>✍️ <span class="app-title">블로그 챌린지</span><span class="tag" id="cohortTag" hidden></span></h1>
@@ -23,6 +23,15 @@
 
   <main class="wrap" id="main" hidden>
     <div class="notice" id="noCohort" hidden>아직 참여 기수가 지정되지 않았습니다. 관리자에게 문의해 주세요.</div>
+
+    <section class="challenge-hero" aria-labelledby="heroTitle">
+      <div class="hero-copy"><span class="eyebrow">MAKE IT A DAILY HABIT</span>
+        <h2 id="heroTitle">오늘의 기록,<br>내일의 가능성.</h2>
+        <p>나만의 속도로 쌓아가는 블로그 챌린지</p>
+        <a class="hero-link" href="#writePost">오늘의 글 등록하기 <span aria-hidden="true">↗</span></a>
+      </div>
+      <div class="hero-art" aria-hidden="true"><i class="art-ring"></i><i class="art-block"></i><i class="art-orb"></i><i class="art-spark">✦</i></div>
+    </section>
 
     <!-- 미션 진척 -->
     <section class="card" id="progressCard">
@@ -48,7 +57,7 @@
 
     <div class="grid2">
       <!-- 블로그 링크 등록 -->
-      <section class="card">
+      <section class="card write-card" id="writePost">
         <h2>🔗 블로그 글 등록 <span class="right"><button class="btn sm" id="cancelEdit" type="button" hidden>수정 취소</button></span></h2>
         <form id="postForm">
           <div class="field" style="margin-bottom:12px">
@@ -77,7 +86,7 @@
       </section>
 
       <!-- 받은 코멘트 -->
-      <section class="card">
+      <section class="card feedback-card" id="feedback">
         <h2>💬 받은 코멘트 <span class="badge new" id="unreadBadge" hidden></span>
           <span class="right"><label class="faint"><input type="checkbox" id="onlyUnread"> 안 읽은 것만</label></span></h2>
         <div class="list-scroll" id="commentFeed" style="max-height:520px"></div>
@@ -85,7 +94,7 @@
     </div>
 
     <!-- 내 포스팅 -->
-    <section class="card">
+    <section class="card" id="myPosts">
       <h2>🗂 내 포스팅
         <span class="right">
           <select id="postFilter" style="width:auto;padding:5px 10px">
@@ -124,6 +133,7 @@
         </form>
       </details>
     </section>
+<nav class="mobile-dock" aria-label="대시보드 바로가기"><a href="#main"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-7 9 7v10H3z"/><path d="M9 20v-7h6v7"/></svg><span>홈</span></a><a href="#writePost"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8v8M8 12h8"/></svg><span>글 등록</span></a><a href="#feedback"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v12H9l-5 4z"/><path d="M8 8h8M8 12h5"/></svg><span>코멘트</span></a><a href="#myPosts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span>내 글</span></a></nav>
   </main>
 
   <script type="module" src="js/member.js"></script>
