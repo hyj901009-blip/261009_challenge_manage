@@ -480,7 +480,7 @@ function renderMembers() {
       <td><b>${esc(m.name || m.loginId)}</b></td>
       <td>${esc(m.loginId)}</td>
       <td><select class="mc" style="width:auto;padding:4px 8px">${cohortOptions(m.cohortId, { withNone: true })}</select></td>
-      <td>${m.blogUrl ? `<a href="${esc(m.blogUrl)}" target="_blank" rel="noopener noreferrer">열기</a>` : '<span class="faint">-</span>'}</td>
+      <td>${blogCell(m)}</td>
       <td class="faint">${esc(fmtDateTime(m.createdAt))}</td>
       <td>
         <button class="btn sm" type="button" data-medit>수정</button>

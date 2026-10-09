@@ -404,11 +404,6 @@ export async function syncNaverVisitors(body = {}) {
   return data;
 }
 
-export async function updateMyBlogUrl(uid, blogUrl) {
-  await ready();
-  await updateDoc(ref('members', uid), { blogUrl });
-}
-
 /* ── 방문자 수 ──────────────────────────────────────────── */
 export async function listVisitsByCohort(cohortId) {
   await ready();

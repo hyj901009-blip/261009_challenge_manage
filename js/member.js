@@ -3,7 +3,7 @@ import { APP } from './config.js';
 import {
   logout, getCohort, listMyPosts, addPost, editMyPost, deleteMyPost, listMyComments, reactToComment,
   listMyVisits, saveVisit, deleteVisit, changeMyPassword, authErrorMessage,
-  isAdminApiEnabled, syncNaverVisitors, updateMyBlogUrl
+  isAdminApiEnabled, syncNaverVisitors
 } from './firebase.js';
 import {
   todayISO, addDays, computeProgress, shortDate, normalizeUrl, isISODate, visitSeries, seriesStats, diffDays, naverBlogId
@@ -290,10 +290,13 @@ $('#visitDel').addEventListener('click', async (ev) => {
 /* ── 네이버 블로그 방문자 수 자동 가져오기 ─────────────── */
 function paintNaver() {
   const id = naverBlogId(S.me.blogUrl);
+  $('#myBlogText').innerHTML = S.me.blogUrl
+    ? `<a href="${esc(S.me.blogUrl)}" target="_blank" rel="noopener noreferrer">${esc(S.me.blogUrl)}</a>`
+    : '아직 등록되지 않음';
   const btn = $('#naverSync');
   btn.disabled = !id || !S.apiEnabled;
   let help;
-  if (!S.me.blogUrl) help = '네이버 블로그 주소를 저장하면 방문자 수를 자동으로 가져옵니다.';
+  if (!S.me.blogUrl) help = '관리자가 블로그 주소를 등록하면 네이버 블로그 방문자 수를 자동으로 가져옵니다. 그 전에는 아래에 직접 입력해 주세요.';
   else if (!id) help = '네이버 블로그가 아니라서 자동으로 가져올 수 없습니다. 아래 [직접 입력하기]를 이용해 주세요.';
   else if (!S.apiEnabled) help = `네이버 블로그(${id})로 인식했습니다. 서버 설정이 끝나면 자동으로 가져옵니다. 그 전에는 직접 입력해 주세요.`;
   else help = `네이버 블로그(${id})의 최근 5일 방문자 수를 매일 자동으로 가져옵니다. 블로그의 방문자 수가 공개되어 있어야 합니다.`;
@@ -318,21 +321,6 @@ async function runNaverSync(btn, { silent } = {}) {
   }
 }
 $('#naverSync').addEventListener('click', (ev) => runNaverSync(ev.currentTarget));
-
-$('#blogForm').addEventListener('submit', async (ev) => {
-  ev.preventDefault();
-  const raw = $('#myBlog').value.trim();
-  const blogUrl = raw ? normalizeUrl(raw) : '';
-  if (raw && !blogUrl) { toast('블로그 주소가 올바르지 않습니다.', 'bad'); return; }
-  await busy($('#blogSave'), async () => {
-    await updateMyBlogUrl(S.user.uid, blogUrl);
-    S.me.blogUrl = blogUrl;
-    $('#myBlog').value = blogUrl;
-    paintNaver();
-    toast('블로그 주소를 저장했습니다.', 'ok');
-    if (naverBlogId(blogUrl) && S.apiEnabled) await runNaverSync($('#naverSync'));
-  }, authErrorMessage);
-});
 
 /** 대시보드를 열 때 하루 한 번 조용히 가져온다 (예약 실행이 놓친 날을 보충) */
 async function autoNaverSync() {
@@ -386,7 +374,6 @@ async function boot() {
   $('#vDate').max = today();
   fillVisitInput();
   paintTypeHelp();
-  $('#myBlog').value = profile.blogUrl || '';
   paintNaver();
   renderAll();
   $('#main').hidden = false;
