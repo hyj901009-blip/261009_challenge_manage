@@ -66,10 +66,12 @@ export function shortDate(iso) {
 const maxDate = (a, b) => (a > b ? a : b);
 const minDate = (a, b) => (a < b ? a : b);
 
-/** 목표값 정리 — 비었거나 이상한 값은 기본값으로 */
+/** 목표값 정리 — 비었거나 이상한 값은 기본값으로.
+ *  weekly: 주당 목표 개수 / total: 챌린지 기간 전체 목표 개수
+ *  (예전 기수 데이터의 monthly 값은 챌린지 목표로 이어서 쓴다) */
 export function normalizeGoals(goals = {}) {
   const pick = (v, d) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Math.floor(Number(v)) : d);
-  return { daily: pick(goals.daily, 1), weekly: pick(goals.weekly, 5), monthly: pick(goals.monthly, 20) };
+  return { weekly: pick(goals.weekly, 5), total: pick(goals.total != null ? goals.total : goals.monthly, 20) };
 }
 
 /** 날짜별 포스팅 수 { 'YYYY-MM-DD': n } — 기간 밖 날짜는 집계하지 않는다 */
@@ -91,7 +93,7 @@ function sumRange(counts, from, to) {
   return n;
 }
 
-/** 기간에 일부만 걸친 주/달은 걸친 일수만큼 목표를 비례 배분(올림) */
+/** 기간에 일부만 걸친 주는 걸친 일수만큼 목표를 비례 배분(올림) */
 function proratedGoal(goal, daysInside, daysTotal) {
   return Math.max(1, Math.ceil(goal * daysInside / daysTotal));
 }
@@ -107,23 +109,12 @@ export function periodWeeks(start, end, weeklyGoal) {
   return out;
 }
 
-/** 기간을 달력 월 단위로 자른 목록 */
-export function periodMonths(start, end, monthlyGoal) {
-  const out = [];
-  for (let ms = monthStart(start); ms <= end; ms = addDays(monthEnd(ms), 1)) {
-    const from = maxDate(ms, start);
-    const to = minDate(monthEnd(ms), end);
-    const total = diffDays(ms, monthEnd(ms)) + 1;
-    out.push({ label: `${Number(ms.slice(5, 7))}월`, from, to, goal: proratedGoal(monthlyGoal, diffDays(from, to) + 1, total) });
-  }
-  return out;
-}
-
 /**
  * 한 사람의 미션 진척을 계산한다.
- * @param cohort { startDate, endDate, goals:{daily,weekly,monthly} }
+ * @param cohort { startDate, endDate, goals:{weekly,total} }
  * @param posts  [{ postDate }]
  * @param today  기준일 'YYYY-MM-DD'
+ * "포스팅한 날" = 그날 글이 1개 이상인 날 (날짜 칸·연속·참여율 계산에 쓴다)
  */
 export function computeProgress(cohort, posts, today) {
   const goals = normalizeGoals(cohort && cohort.goals);
@@ -136,9 +127,9 @@ export function computeProgress(cohort, posts, today) {
   const phase = today < start ? 'before' : today > end ? 'after' : 'running';
   // 기간 밖이면 가장 가까운 기간 안 날짜를 기준으로 보여 준다
   const ref = today < start ? start : today > end ? end : today;
+  const posted = (d) => (counts[d] || 0) > 0;
 
-  const dailyCount = counts[ref] || 0;
-  const daily = { date: ref, count: dailyCount, goal: goals.daily, done: dailyCount >= goals.daily };
+  const todayInfo = { date: ref, count: counts[ref] || 0, done: posted(ref) };
 
   const weeks = periodWeeks(start, end, goals.weekly).map((w) => {
     const count = sumRange(counts, w.from, w.to);
@@ -146,30 +137,27 @@ export function computeProgress(cohort, posts, today) {
   });
   const weekly = weeks.find((w) => w.from <= ref && ref <= w.to);
 
-  const months = periodMonths(start, end, goals.monthly).map((m) => {
-    const count = sumRange(counts, m.from, m.to);
-    return Object.assign(m, { count, done: count >= m.goal });
-  });
-  const monthly = months.find((m) => m.from <= ref && ref <= m.to);
+  const totalPosts = Object.values(counts).reduce((a, b) => a + b, 0);
+  const challenge = { from: start, to: end, count: totalPosts, goal: goals.total, done: totalPosts >= goals.total };
 
-  // 지난 날짜 + (오늘 이미 달성했다면 오늘) 을 분모로 — 아침마다 달성률이 뚝 떨어지지 않게
+  // 지난 날짜 + (오늘 이미 썼다면 오늘) 을 분모로 — 아침마다 참여율이 뚝 떨어지지 않게
   let elapsedEnd = null;
   if (phase === 'after') elapsedEnd = end;
-  else if (phase === 'running') elapsedEnd = daily.done ? today : addDays(today, -1);
+  else if (phase === 'running') elapsedEnd = todayInfo.done ? today : addDays(today, -1);
   const elapsedDays = elapsedEnd && elapsedEnd >= start ? dateRange(start, elapsedEnd) : [];
-  const achievedDays = elapsedDays.filter((d) => (counts[d] || 0) >= goals.daily).length;
+  const postedDays = elapsedDays.filter(posted).length;
 
-  // 연속 달성: 오늘 달성했으면 오늘부터, 아니면 어제부터 거꾸로
+  // 연속 포스팅: 오늘 썼으면 오늘부터, 아니면 어제부터 거꾸로
   let streak = 0;
   if (phase !== 'before') {
-    let cur = phase === 'after' ? end : (daily.done ? today : addDays(today, -1));
-    while (cur >= start && (counts[cur] || 0) >= goals.daily) { streak++; cur = addDays(cur, -1); }
+    let cur = phase === 'after' ? end : (todayInfo.done ? today : addDays(today, -1));
+    while (cur >= start && posted(cur)) { streak++; cur = addDays(cur, -1); }
   }
 
   const days = dateRange(start, end).map((d) => ({
     date: d,
     count: counts[d] || 0,
-    done: (counts[d] || 0) >= goals.daily,
+    done: posted(d),
     future: d > today
   }));
 
@@ -180,18 +168,32 @@ export function computeProgress(cohort, posts, today) {
     goals,
     totalDays: days.length,
     dayNumber: phase === 'running' ? diffDays(start, today) + 1 : null,
-    daily,
+    today: todayInfo,
     weekly,
-    monthly,
     weeks,
-    months,
+    challenge,
     days,
-    totalPosts: Object.values(counts).reduce((a, b) => a + b, 0),
-    achievedDays,
+    totalPosts,
+    postedDays,
     elapsedDays: elapsedDays.length,
-    rate: elapsedDays.length ? Math.round((achievedDays / elapsedDays.length) * 100) : 0,
+    rate: elapsedDays.length ? Math.round((postedDays / elapsedDays.length) * 100) : 0,
+    goalRate: Math.min(100, Math.round((totalPosts / goals.total) * 100)),
     streak
   };
+}
+
+/**
+ * 순위 매기기 — rows 를 key 값이 큰 순으로 줄 세우고 동점은 같은 등수(1, 2, 2, 4 …).
+ * 같은 값끼리는 이름 가나다순.
+ */
+export function rankRows(rows, key = 'count') {
+  const sorted = rows.slice().sort((a, b) => (b[key] - a[key]) || String(a.name || '').localeCompare(String(b.name || ''), 'ko'));
+  let prev = null;
+  let rank = 0;
+  return sorted.map((r, i) => {
+    if (r[key] !== prev) { rank = i + 1; prev = r[key]; }
+    return Object.assign({}, r, { rank });
+  });
 }
 
 /** 로그인 ID 규칙: 한글/영문/숫자/밑줄 2~20자. 영문은 소문자로 맞춘다. */
@@ -234,15 +236,17 @@ export function visitSeries(visits, from, to) {
   return dateRange(from, to).map((d) => ({ date: d, value: d in map ? map[d] : null }));
 }
 
-/** 시계열 요약: 최근값, 직전 대비 변화, 평균, 최대 */
+/** 시계열 요약: 가장 최근 값(현재), 직전 대비 변화, 평균, 최대 */
 export function seriesStats(series) {
   const vals = series.filter((p) => p.value != null);
-  if (!vals.length) return { last: null, prev: null, delta: null, avg: null, max: null, n: 0 };
+  if (!vals.length) return { last: null, lastDate: null, prev: null, delta: null, avg: null, max: null, n: 0 };
   const last = vals[vals.length - 1].value;
+  const lastDate = vals[vals.length - 1].date;
   const prev = vals.length > 1 ? vals[vals.length - 2].value : null;
   const sum = vals.reduce((a, p) => a + p.value, 0);
   return {
     last,
+    lastDate,
     prev,
     delta: prev == null ? null : last - prev,
     avg: Math.round(sum / vals.length),

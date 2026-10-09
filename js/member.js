@@ -1,19 +1,19 @@
-/* 챌린지원 대시보드 — 미션 진척 / 블로그 글 등록 / 받은 코멘트 + 반응 / 방문자 추이 */
+/* 챌린지원 대시보드 — 미션 진척 / 순위 / 블로그 글 등록 / 받은 코멘트 + 반응 / 방문자 추이 */
 import { APP } from './config.js';
 import {
   logout, getCohort, listMyPosts, addPost, editMyPost, deleteMyPost, listMyComments, reactToComment,
-  listMyVisits, saveVisit, deleteVisit, changeMyPassword, authErrorMessage,
-  isAdminApiEnabled, syncNaverVisitors
+  listMyVisits, saveVisit, deleteVisit, authErrorMessage,
+  isAdminApiEnabled, syncNaverVisitors, getLeaderboard
 } from './firebase.js';
 import {
-  todayISO, addDays, computeProgress, shortDate, normalizeUrl, isISODate, visitSeries, seriesStats, diffDays, naverBlogId
+  todayISO, addDays, computeProgress, shortDate, normalizeUrl, isISODate, visitSeries, seriesStats, diffDays, naverBlogId, rankRows
 } from './utils.js';
 import {
   $, $$, esc, toast, busy, requireRole, progressBlock, dayStrip, lineChart, statusBadge, fmtDateTime,
-  tsMillis, reactionOf, POST_TYPE
+  tsMillis, reactionOf, POST_TYPE, installTooltips, fmtTime
 } from './ui.js';
 
-const S = { user: null, me: null, cohort: null, posts: [], comments: [], visits: [], editingId: null, apiEnabled: false };
+const S = { user: null, me: null, cohort: null, posts: [], comments: [], visits: [], editingId: null, apiEnabled: false, board: null };
 const today = () => todayISO(APP.timezone);
 
 $$('.app-title').forEach((el) => { el.textContent = APP.title; });
@@ -42,31 +42,68 @@ function renderProgress() {
 
   $('#summaryTiles').innerHTML = `
     <div class="tile"><div class="lbl">총 포스팅</div><div class="val">${pr.totalPosts}<small> 개</small></div></div>
-    <div class="tile"><div class="lbl">연속 달성</div><div class="val">🔥 ${pr.streak}<small> 일</small></div></div>
-    <div class="tile"><div class="lbl">데일리 달성률</div><div class="val">${pr.rate}<small>% (${pr.achievedDays}/${pr.elapsedDays}일)</small></div></div>`;
+    <div class="tile"><div class="lbl">오늘 포스팅</div><div class="val">${pr.phase === 'running' ? (pr.today.done ? `✅<small> ${pr.today.count}개</small>` : '<small>아직이에요</small>') : '-'}</div></div>
+    <div class="tile"><div class="lbl">연속 포스팅</div><div class="val">🔥 ${pr.streak}<small> 일</small></div></div>`;
 
-  const refLabel = pr.phase === 'running' ? '오늘' : shortDate(pr.ref);
   $('#progBlocks').innerHTML =
-    progressBlock(`데일리 · ${refLabel}`, pr.daily.count, pr.daily.goal, `하루 ${pr.goals.daily}개 목표`) +
-    progressBlock(`위클리 · ${pr.weekly.index}주차`, pr.weekly.count, pr.weekly.goal, `${shortDate(pr.weekly.from)} ~ ${shortDate(pr.weekly.to)}`) +
-    progressBlock(`먼슬리 · ${pr.monthly.label}`, pr.monthly.count, pr.monthly.goal, `${shortDate(pr.monthly.from)} ~ ${shortDate(pr.monthly.to)}`);
+    progressBlock(`위클리 · ${pr.weekly.index}주차`, pr.weekly.count, pr.weekly.goal, `${shortDate(pr.weekly.from)} ~ ${shortDate(pr.weekly.to)} · 주 ${pr.goals.weekly}개 목표`) +
+    progressBlock('챌린지 목표', pr.challenge.count, pr.challenge.goal, `${shortDate(pr.challenge.from)} ~ ${shortDate(pr.challenge.to)} · 전체 기간`);
 
   $('#strip').innerHTML = dayStrip(pr.days, t);
   $('#weekTable').innerHTML = `<table><thead><tr><th>주차</th><th>기간</th><th class="num">달성</th></tr></thead><tbody>${
     pr.weeks.map((w) => `<tr><td>${w.index}주차</td><td>${shortDate(w.from)}~${shortDate(w.to)}</td>
       <td class="num">${w.count}/${w.goal} ${w.done ? '✅' : ''}</td></tr>`).join('')}</tbody></table>`;
-  $('#monthTable').innerHTML = `<table><thead><tr><th>월</th><th>기간</th><th class="num">달성</th></tr></thead><tbody>${
-    pr.months.map((m) => `<tr><td>${m.label}</td><td>${shortDate(m.from)}~${shortDate(m.to)}</td>
-      <td class="num">${m.count}/${m.goal} ${m.done ? '✅' : ''}</td></tr>`).join('')}</tbody></table>`;
+}
+
+/* ── 순위 ─────────────────────────────────────────────── */
+async function loadRanking() {
+  if (!S.cohort) { $('#ranking').hidden = true; return; }
+  if (!S.apiEnabled) {
+    $('#rankBody').innerHTML = '<div class="empty">순위는 관리자가 서버 설정을 마치면 보입니다.</div>';
+    return;
+  }
+  try {
+    S.board = await getLeaderboard();
+  } catch (e) {
+    console.warn(e);
+    $('#rankBody').innerHTML = `<div class="empty">순위를 불러오지 못했습니다. (${esc(e.message)})</div>`;
+    return;
+  }
+  renderRanking();
+}
+
+function renderRanking() {
+  if (!S.board) return;
+  // 내 개수는 방금 등록·삭제한 것까지 반영되도록 화면에서 바로 센 값으로 덮어쓴다 (서버 순위는 5분마다 갱신)
+  const mine = computeProgress(S.cohort, myCohortPosts(), today());
+  const rows = S.board.rows.map((r) => (r.uid === S.user.uid && mine.valid ? Object.assign({}, r, { count: mine.totalPosts }) : r));
+  if (!rows.some((r) => r.uid === S.user.uid) && mine.valid) rows.push({ uid: S.user.uid, name: S.me.name || S.me.loginId, count: mine.totalPosts });
+  const ranked = rankRows(rows);
+  const max = Math.max(1, ...ranked.map((r) => r.count));
+  const me = ranked.find((r) => r.uid === S.user.uid);
+  const medal = (n) => (n === 1 ? '🥇' : n === 2 ? '🥈' : n === 3 ? '🥉' : `${n}`);
+  $('#rankMeta').textContent = `${ranked.length}명 · ${fmtTime(S.board.updatedAt)} 기준`;
+  $('#rankBody').innerHTML = `
+    ${me ? `<div class="rank-me">나의 순위 <b>${me.rank}위</b> <span class="faint">/ ${ranked.length}명 · ${me.count}개</span></div>` : ''}
+    <ol class="rank-list">${ranked.map((r) => `
+      <li class="${r.uid === S.user.uid ? 'me' : ''}">
+        <span class="rank-no">${medal(r.rank)}</span>
+        <span class="rank-name">${esc(r.name)}${r.uid === S.user.uid ? ' <span class="badge info">나</span>' : ''}</span>
+        <span class="rank-bar"><i style="width:${Math.round((r.count / max) * 100)}%"></i></span>
+        <span class="rank-cnt"><b>${r.count}</b>개</span>
+      </li>`).join('')}</ol>`;
 }
 
 /* ── 글 등록 ──────────────────────────────────────────── */
 function currentType() { return $('input[name="ptype"]:checked').value; }
 
 function paintTypeHelp() {
-  $('#typeHelp').textContent = currentType() === 'review'
+  const review = currentType() === 'review';
+  $('#typeHelp').textContent = review
     ? '관리자가 글을 읽고 검토 결과와 코멘트를 남겨 줍니다.'
     : '검토 없이 바로 미션으로 기록됩니다. (관리자가 코멘트를 남길 수도 있어요)';
+  // '관리자에게 한마디'는 검토 요청일 때만
+  $('#memoField').hidden = !review;
 }
 $$('input[name="ptype"]').forEach((r) => r.addEventListener('change', paintTypeHelp));
 
@@ -97,13 +134,14 @@ $('#postForm').addEventListener('submit', async (ev) => {
   if (postDate > today()) { toast('미래 날짜로는 등록할 수 없습니다.', 'bad'); return; }
   const c = S.cohort;
   if (c && (postDate < c.startDate || postDate > c.endDate)) {
-    if (!confirm('미션 기간 밖의 날짜입니다. 등록은 되지만 진척에는 반영되지 않습니다. 계속할까요?')) return;
+    toast(`발행일은 미션 기간(${shortDate(c.startDate)} ~ ${shortDate(c.endDate)}) 안에서 골라 주세요.`, 'bad');
+    return;
   }
   const data = {
     url,
     title: $('#pTitle').value.trim().slice(0, 120),
     postDate,
-    memo: $('#pMemo').value.trim().slice(0, 300),
+    memo: currentType() === 'review' ? $('#pMemo').value.trim().slice(0, 300) : '',
     type: currentType()
   };
   await busy($('#postBtn'), async () => {
@@ -238,7 +276,7 @@ function visitRange() {
   const c = S.cohort;
   const t = today();
   if (c && isISODate(c.startDate) && isISODate(c.endDate)) {
-    return { from: c.startDate, to: t < c.endDate ? (t < c.startDate ? c.startDate : t) : c.endDate };
+    return { from: c.startDate, to: c.endDate }; // 챌린지 기간 전체 — 아직 오지 않은 날은 빈칸
   }
   return { from: addDays(t, -29), to: t };
 }
@@ -247,13 +285,11 @@ function renderVisits() {
   const { from, to } = visitRange();
   const series = visitSeries(S.visits, from, to);
   const st = seriesStats(series);
-  const delta = st.delta == null ? '-' : `<span class="delta ${st.delta >= 0 ? 'up' : 'down'}">${st.delta >= 0 ? '▲' : '▼'} ${Math.abs(st.delta).toLocaleString()}</span>`;
   $('#visitTiles').innerHTML = `
-    <div class="tile"><div class="lbl">최근 기록</div><div class="val">${st.last == null ? '-' : st.last.toLocaleString()}<small> 명</small></div></div>
-    <div class="tile"><div class="lbl">직전 대비</div><div class="val">${delta}</div></div>
+    <div class="tile"><div class="lbl">현재 일방문자수${st.lastDate ? ` <span class="faint">(${shortDate(st.lastDate)})</span>` : ''}</div><div class="val">${st.last == null ? '-' : st.last.toLocaleString()}<small> 명</small></div></div>
     <div class="tile"><div class="lbl">평균</div><div class="val">${st.avg == null ? '-' : st.avg.toLocaleString()}<small> 명</small></div></div>
     <div class="tile"><div class="lbl">최고</div><div class="val">${st.max == null ? '-' : st.max.toLocaleString()}<small> 명</small></div></div>`;
-  $('#visitChart').innerHTML = lineChart(series, { label: '방문자' });
+  $('#visitChart').innerHTML = lineChart(series, { label: '방문자', today: today() });
 }
 
 function fillVisitInput() {
@@ -330,20 +366,10 @@ async function autoNaverSync() {
   await runNaverSync($('#naverSync'), { silent: true });
 }
 
-/* ── 비밀번호 ─────────────────────────────────────────── */
-$('#pwForm').addEventListener('submit', async (ev) => {
-  ev.preventDefault();
-  if ($('#pwNew').value !== $('#pwNew2').value) { toast('새 비밀번호 확인이 일치하지 않습니다.', 'bad'); return; }
-  await busy($('#pwBtn'), async () => {
-    await changeMyPassword($('#pwCur').value, $('#pwNew').value);
-    $('#pwForm').reset();
-    toast('비밀번호를 변경했습니다.', 'ok');
-  }, authErrorMessage);
-});
-
 /* ── 시작 ─────────────────────────────────────────────── */
 function renderAll() {
   renderProgress();
+  renderRanking();
   renderCommentFeed();
   renderPosts();
   renderVisits();
@@ -376,8 +402,10 @@ async function boot() {
   paintTypeHelp();
   paintNaver();
   renderAll();
+  installTooltips();
   $('#main').hidden = false;
   autoNaverSync();
+  loadRanking();
 }
 
 boot().catch((e) => {

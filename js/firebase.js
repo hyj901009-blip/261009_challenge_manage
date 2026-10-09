@@ -9,7 +9,8 @@
  *
  * 컬렉션 구조
  *   meta/app            { activeCohortId }
- *   cohorts/{id}        { name, startDate, endDate, goals:{daily,weekly,monthly}, status, createdAt }
+ *   cohorts/{id}        { name, startDate, endDate, goals:{weekly,total}, status, createdAt }
+ *   leaderboards/{id}   { rows, updatedAt }   ← 서버(api/leaderboard.js)만 쓰는 순위 캐시
  *   members/{uid}       { loginId, name, cohortId, blogUrl, createdAt }
  *   posts/{id}          { uid, loginId, name, cohortId, url, title, postDate, type:'review'|'free',
  *                         status:'pending'|'approved'|'revise'|'free', memo, createdAt, updatedAt, reviewedAt }
@@ -19,7 +20,7 @@
 import { initializeApp, deleteApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider, connectAuthEmulator,
+  signOut, connectAuthEmulator,
   GoogleAuthProvider, signInWithPopup
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import {
@@ -142,16 +143,6 @@ export async function getRole(user) {
   const m = await getDoc(ref('members', user.uid));
   if (m.exists()) return { role: 'member', profile: withId(m) };
   return { role: null, profile: null };
-}
-
-export async function changeMyPassword(currentPw, newPw) {
-  await ready();
-  const msg = validatePassword(newPw);
-  if (msg) throw new Error(msg);
-  const user = auth.currentUser;
-  if (!user) throw new Error('로그인이 필요합니다.');
-  await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, currentPw));
-  await updatePassword(user, newPw);
 }
 
 /**
@@ -398,6 +389,19 @@ export async function syncNaverVisitors(body = {}) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(body)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `요청 실패 (${res.status})`);
+  return data;
+}
+
+/* ── 순위 (서버 API) ─────────────────────────────────── */
+/** 챌린지원은 자기 기수, 관리자는 cohortId 기수의 순위 { rows:[{uid,name,count}], updatedAt } */
+export async function getLeaderboard(cohortId = '') {
+  await ready();
+  const token = await auth.currentUser.getIdToken();
+  const res = await fetch(`/api/leaderboard${cohortId ? `?cohortId=${encodeURIComponent(cohortId)}` : ''}`, {
+    headers: { Authorization: `Bearer ${token}` }, cache: 'no-store'
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `요청 실패 (${res.status})`);

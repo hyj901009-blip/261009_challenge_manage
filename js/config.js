@@ -30,7 +30,8 @@ export const APP = {
   idEmailDomain: 'challenge.example.com',
 
   // 새 기수를 만들 때 기본으로 채워지는 미션 목표 (기수마다 관리자 화면에서 바꿀 수 있음)
-  defaultGoals: { daily: 1, weekly: 5, monthly: 20 },
+  // weekly: 주당 포스팅 목표 / total: 챌린지 기간 전체 포스팅 목표
+  defaultGoals: { weekly: 5, total: 20 },
 
   commentMaxLength: 500,
 

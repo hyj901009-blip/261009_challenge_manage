@@ -37,22 +37,25 @@
     <section class="card" id="progressCard">
       <h2>📈 미션 진척 <span class="right faint" id="periodText"></span></h2>
       <div class="tiles" id="summaryTiles"></div>
-      <div class="grid3" id="progBlocks"></div>
+      <div class="grid2" id="progBlocks"></div>
       <h3>날짜별 기록</h3>
       <div id="strip"></div>
       <div class="legend">
-        <span><i style="background:var(--ok)"></i>목표 달성</span>
-        <span><i style="background:var(--warn-soft);border:1px solid var(--warn)"></i>일부</span>
+        <span><i style="background:var(--ok)"></i>포스팅함</span>
         <span><i style="background:var(--bad-soft)"></i>미등록</span>
         <span><i style="background:var(--surface-2);border:1px solid var(--border)"></i>예정</span>
       </div>
       <details class="fold" style="margin-top:12px">
-        <summary>주차별 · 월별 상세 보기</summary>
-        <div class="grid2" style="margin-top:10px">
-          <div class="table-wrap" id="weekTable"></div>
-          <div class="table-wrap" id="monthTable"></div>
-        </div>
+        <summary>주차별 상세 보기</summary>
+        <div class="table-wrap" id="weekTable" style="margin-top:10px"></div>
       </details>
+    </section>
+
+    <!-- 순위 -->
+    <section class="card" id="ranking">
+      <h2>🏆 챌린지 순위 <span class="right faint" id="rankMeta"></span></h2>
+      <p class="faint" style="margin-top:-6px">챌린지 기간 동안 등록한 포스팅 개수로 순위를 매깁니다.</p>
+      <div id="rankBody"></div>
     </section>
 
     <div class="grid2">
@@ -78,7 +81,7 @@
               <input type="date" id="pDate" required>
             </label>
           </div>
-          <label class="field" style="margin-top:10px"><span>관리자에게 한마디 (선택)</span>
+          <label class="field" id="memoField" style="margin-top:10px"><span>관리자에게 한마디 (선택)</span>
             <textarea id="pMemo" maxlength="300" placeholder="검토받고 싶은 부분 등을 적어 주세요."></textarea>
           </label>
           <button class="btn primary block" id="postBtn" type="submit">등록하기</button>
@@ -130,19 +133,7 @@
       <div id="visitChart"></div>
     </section>
 
-    <!-- 계정 -->
-    <section class="card">
-      <details class="fold">
-        <summary>🔒 비밀번호 변경</summary>
-        <form id="pwForm" style="margin-top:10px;max-width:360px">
-          <label class="field"><span>현재 비밀번호</span><input type="password" id="pwCur" autocomplete="current-password" required></label>
-          <label class="field"><span>새 비밀번호 (6자 이상)</span><input type="password" id="pwNew" autocomplete="new-password" required></label>
-          <label class="field"><span>새 비밀번호 확인</span><input type="password" id="pwNew2" autocomplete="new-password" required></label>
-          <button class="btn" id="pwBtn" type="submit">변경하기</button>
-        </form>
-      </details>
-    </section>
-<nav class="mobile-dock" aria-label="대시보드 바로가기"><a href="#main"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-7 9 7v10H3z"/><path d="M9 20v-7h6v7"/></svg><span>홈</span></a><a href="#writePost"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8v8M8 12h8"/></svg><span>글 등록</span></a><a href="#feedback"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v12H9l-5 4z"/><path d="M8 8h8M8 12h5"/></svg><span>코멘트</span></a><a href="#myPosts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span>내 글</span></a></nav>
+<nav class="mobile-dock" aria-label="대시보드 바로가기"><a href="#main"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-7 9 7v10H3z"/><path d="M9 20v-7h6v7"/></svg><span>홈</span></a><a href="#writePost"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8v8M8 12h8"/></svg><span>글 등록</span></a><a href="#feedback"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v12H9l-5 4z"/><path d="M8 8h8M8 12h5"/></svg><span>코멘트</span></a><a href="#ranking"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8"/></svg><span>순위</span></a><a href="#myPosts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span>내 글</span></a></nav>
   </main>
 
   <script type="module" src="js/member.js"></script>

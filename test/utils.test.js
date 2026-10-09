@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  todayISO, addDays, diffDays, dateRange, weekStart, monthEnd, periodWeeks, periodMonths, computeProgress,
+  todayISO, addDays, diffDays, dateRange, weekStart, monthEnd, periodWeeks, computeProgress, normalizeGoals, rankRows,
   normalizeLoginId, validateLoginId, validatePassword, normalizeUrl, visitSeries, seriesStats, isISODate, shortDate
 } from '../js/utils.js';
 
@@ -22,7 +22,7 @@ test('날짜 연산', () => {
   assert.ok(!isISODate('2026-02-30'));
 });
 
-test('부분 주·월은 목표를 비례 배분', () => {
+test('부분 주는 목표를 비례 배분', () => {
   // 2026-10-07(수) ~ 2026-10-31(토)
   const w = periodWeeks('2026-10-07', '2026-10-31', 5);
   assert.equal(w[0].from, '2026-10-07');
@@ -30,14 +30,16 @@ test('부분 주·월은 목표를 비례 배분', () => {
   assert.equal(w[0].goal, Math.ceil(5 * 5 / 7)); // 5일 걸침 → 4
   assert.equal(w[1].goal, 5);
   assert.equal(w.at(-1).to, '2026-10-31');
-  const m = periodMonths('2026-10-15', '2026-11-14', 20);
-  assert.equal(m.length, 2);
-  assert.equal(m[0].label, '10월');
-  assert.equal(m[0].goal, Math.ceil(20 * 17 / 31));
+});
+
+test('목표값 — 예전 monthly 값은 챌린지 목표로 이어진다', () => {
+  assert.deepEqual(normalizeGoals({ weekly: 3, total: 12 }), { weekly: 3, total: 12 });
+  assert.deepEqual(normalizeGoals({ daily: 1, weekly: 5, monthly: 18 }), { weekly: 5, total: 18 });
+  assert.deepEqual(normalizeGoals({}), { weekly: 5, total: 20 });
 });
 
 test('진척 계산 — 데일리/위클리/먼슬리, 연속, 달성률', () => {
-  const cohort = { startDate: '2026-10-05', endDate: '2026-11-01', goals: { daily: 1, weekly: 5, monthly: 20 } };
+  const cohort = { startDate: '2026-10-05', endDate: '2026-11-01', goals: { weekly: 5, total: 20 } };
   const posts = ['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-08', '2026-10-09', '2026-09-30']
     .map((postDate) => ({ postDate }));
   const pr = computeProgress(cohort, posts, '2026-10-09');
@@ -45,20 +47,20 @@ test('진척 계산 — 데일리/위클리/먼슬리, 연속, 달성률', () =>
   assert.equal(pr.phase, 'running');
   assert.equal(pr.dayNumber, 5);
   assert.equal(pr.totalPosts, 6); // 기간 밖 9/30 제외
-  assert.deepEqual([pr.daily.count, pr.daily.done], [1, true]);
+  assert.deepEqual([pr.today.count, pr.today.done], [1, true]);
   assert.deepEqual([pr.weekly.count, pr.weekly.goal, pr.weekly.done], [6, 5, true]);
-  assert.equal(pr.monthly.label, '10월');
-  assert.equal(pr.monthly.count, 6);
+  assert.deepEqual([pr.challenge.count, pr.challenge.goal, pr.challenge.done], [6, 20, false]);
+  assert.equal(pr.goalRate, 30);
   assert.equal(pr.streak, 5);
   assert.equal(pr.rate, 100);
   assert.equal(pr.days.length, 28);
 });
 
 test('오늘 아직 안 썼으면 어제까지로 연속·달성률 계산', () => {
-  const cohort = { startDate: '2026-10-05', endDate: '2026-11-01', goals: { daily: 1 } };
+  const cohort = { startDate: '2026-10-05', endDate: '2026-11-01', goals: {} };
   const posts = ['2026-10-06', '2026-10-07', '2026-10-08'].map((postDate) => ({ postDate }));
   const pr = computeProgress(cohort, posts, '2026-10-09');
-  assert.equal(pr.daily.done, false);
+  assert.equal(pr.today.done, false);
   assert.equal(pr.streak, 3);
   assert.equal(pr.elapsedDays, 4);
   assert.equal(pr.rate, 75);
@@ -124,4 +126,9 @@ test('네이버 방문자 XML 파싱', async () => {
     { date: '2026-10-07', count: 120 }, { date: '2026-10-08', count: 88 }, { date: '2026-10-09', count: 5 }
   ]);
   assert.deepEqual(parseNaverVisitors('<html>error</html>'), []);
+});
+
+test('순위 — 동점은 같은 등수', () => {
+  const r = rankRows([{ name: '다', count: 3 }, { name: '가', count: 5 }, { name: '나', count: 3 }, { name: '라', count: 0 }]);
+  assert.deepEqual(r.map((x) => `${x.rank}${x.name}`), ['1가', '2나', '2다', '4라']);
 });

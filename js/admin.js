@@ -8,10 +8,11 @@ import {
 } from './firebase.js';
 import {
   todayISO, addDays, computeProgress, shortDate, isISODate, normalizeGoals, normalizeUrl, normalizeLoginId,
-  validateLoginId, validatePassword, visitSeries, seriesStats, naverBlogId
+  validateLoginId, validatePassword, visitSeries, seriesStats, naverBlogId, rankRows
 } from './utils.js';
 import {
-  $, $$, esc, toast, busy, requireRole, lineChart, statusBadge, fmtDateTime, tsMillis, reactionOf, POST_TYPE
+  $, $$, esc, toast, busy, requireRole, lineChart, statusBadge, fmtDateTime, tsMillis, reactionOf, POST_TYPE,
+  installTooltips
 } from './ui.js';
 
 const S = {
@@ -75,43 +76,47 @@ function renderProgress() {
   if (!c) { $('#progTiles').innerHTML = ''; $('#progTable').innerHTML = '<div class="empty">기수를 먼저 만들어 주세요.</div>'; $('#matrix').innerHTML = ''; return; }
   const rows = progressRows();
   const ref = $('#refDate').value || today();
-  $('#periodText').textContent = `${c.name} · ${shortDate(c.startDate)} ~ ${shortDate(c.endDate)} · 목표 일 ${normalizeGoals(c.goals).daily} / 주 ${normalizeGoals(c.goals).weekly} / 월 ${normalizeGoals(c.goals).monthly}`;
+  const g = normalizeGoals(c.goals);
+  $('#periodText').textContent = `${c.name} · ${shortDate(c.startDate)} ~ ${shortDate(c.endDate)} · 목표 주 ${g.weekly}개 / 챌린지 ${g.total}개`;
 
   const valid = rows.filter((r) => r.pr.valid);
   const n = valid.length;
   const cnt = (f) => valid.filter(f).length;
-  const avgRate = n ? Math.round(valid.reduce((a, r) => a + r.pr.rate, 0) / n) : 0;
+  const avgGoal = n ? Math.round(valid.reduce((a, r) => a + r.pr.goalRate, 0) / n) : 0;
   const pending = S.posts.filter((p) => p.status === 'pending').length;
   const unread = S.comments.filter((c2) => !c2.readAt).length;
   $('#progTiles').innerHTML = `
     <div class="tile"><div class="lbl">참여 인원</div><div class="val">${n}<small> 명</small></div></div>
-    <div class="tile"><div class="lbl">데일리 달성 (${esc(shortDate(valid[0] ? valid[0].pr.ref : ref))})</div><div class="val">${cnt((r) => r.pr.daily.done)}<small> / ${n}</small></div></div>
+    <div class="tile"><div class="lbl">포스팅한 사람 (${esc(shortDate(valid[0] ? valid[0].pr.ref : ref))})</div><div class="val">${cnt((r) => r.pr.today.done)}<small> / ${n}</small></div></div>
     <div class="tile"><div class="lbl">이번 주 위클리 달성</div><div class="val">${cnt((r) => r.pr.weekly.done)}<small> / ${n}</small></div></div>
-    <div class="tile"><div class="lbl">이번 달 먼슬리 달성</div><div class="val">${cnt((r) => r.pr.monthly.done)}<small> / ${n}</small></div></div>
-    <div class="tile"><div class="lbl">평균 데일리 달성률</div><div class="val">${avgRate}<small>%</small></div></div>
+    <div class="tile"><div class="lbl">챌린지 목표 달성</div><div class="val">${cnt((r) => r.pr.challenge.done)}<small> / ${n}</small></div></div>
+    <div class="tile"><div class="lbl">평균 챌린지 목표 진행률</div><div class="val">${avgGoal}<small>%</small></div></div>
     <div class="tile"><div class="lbl">검토 대기 · 안 읽은 코멘트</div><div class="val">${pending}<small> · ${unread}</small></div></div>`;
 
+  // 순위: 챌린지 기간 포스팅 개수 (동점은 같은 등수)
+  const rankOf = new Map(rankRows(valid.map((r) => ({ uid: r.uid, name: r.name, count: r.pr.totalPosts }))).map((x) => [x.uid, x.rank]));
   const sort = $('#sortSel').value;
   const sorted = valid.slice().sort((a, b) => {
-    if (sort === 'rate') return b.pr.rate - a.pr.rate || a.name.localeCompare(b.name, 'ko');
-    if (sort === 'rateAsc') return a.pr.rate - b.pr.rate || a.name.localeCompare(b.name, 'ko');
+    if (sort === 'rate') return b.pr.goalRate - a.pr.goalRate || a.name.localeCompare(b.name, 'ko');
+    if (sort === 'rateAsc') return a.pr.goalRate - b.pr.goalRate || a.name.localeCompare(b.name, 'ko');
     if (sort === 'total') return b.pr.totalPosts - a.pr.totalPosts || a.name.localeCompare(b.name, 'ko');
     return a.name.localeCompare(b.name, 'ko');
   });
   $('#progTable').innerHTML = !sorted.length ? '<div class="empty">아직 이 기수에 챌린지원이 없습니다.</div>' : `
-    <table><thead><tr><th>이름</th><th>데일리</th><th>위클리</th><th>먼슬리</th><th class="num">총 포스팅</th><th class="num">연속</th><th class="num">달성률</th><th>검토</th></tr></thead>
+    <table><thead><tr><th class="num">순위</th><th>이름</th><th>오늘</th><th>위클리</th><th>챌린지 목표</th><th class="num">총 포스팅</th><th class="num">연속</th><th class="num">진행률</th><th>검토</th></tr></thead>
     <tbody>${sorted.map((r) => {
       const pr = r.pr;
       const mine = S.posts.filter((p) => p.uid === r.uid);
       const pend = mine.filter((p) => p.status === 'pending').length;
       return `<tr>
+        <td class="num"><b>${rankOf.get(r.uid)}</b></td>
         <td><b>${esc(r.name)}</b> <span class="faint">${esc(r.loginId)}</span>${tag(r)}</td>
-        <td>${pr.daily.count}/${pr.daily.goal} ${pr.daily.done ? '✅' : ''}</td>
+        <td>${pr.today.done ? `✅ ${pr.today.count}` : '-'}</td>
         <td>${pr.weekly.count}/${pr.weekly.goal}${miniBar(pr.weekly.count, pr.weekly.goal)}</td>
-        <td>${pr.monthly.count}/${pr.monthly.goal}${miniBar(pr.monthly.count, pr.monthly.goal)}</td>
+        <td>${pr.challenge.count}/${pr.challenge.goal}${miniBar(pr.challenge.count, pr.challenge.goal)}</td>
         <td class="num">${pr.totalPosts}</td>
         <td class="num">🔥${pr.streak}</td>
-        <td class="num">${pr.rate}%</td>
+        <td class="num">${pr.goalRate}%</td>
         <td>${pend ? `<span class="badge warn">대기 ${pend}</span>` : ''}</td></tr>`;
     }).join('')}</tbody></table>`;
   renderMatrix(sorted, ref);
@@ -124,16 +129,15 @@ function renderMatrix(rows, ref) {
   let head, body;
   if (view === 'daily') {
     const days = rows[0].pr.days;
-    head = days.map((d) => `<th class="${d.date === ref ? 'today' : ''}" title="${esc(shortDate(d.date))}">${Number(d.date.slice(8))}</th>`).join('');
+    head = days.map((d) => `<th class="${d.date === ref ? 'today' : ''}" title="${esc(shortDate(d.date))}">${d.date.slice(5, 7)}/${d.date.slice(8)}</th>`).join('');
     body = rows.map((r) => `<tr><td>${esc(r.name)}</td>${r.pr.days.map((d) => {
       const fut = d.date > ref;
-      return `<td><span class="m ${cls(d.count, r.pr.goals.daily, fut)}" title="${esc(shortDate(d.date))} · ${d.count}개">${fut ? '' : d.count}</span></td>`;
+      return `<td><span class="m ${cls(d.count, 1, fut)}" title="${esc(shortDate(d.date))} · ${d.count}개">${fut ? '' : d.count}</span></td>`;
     }).join('')}</tr>`).join('');
   } else {
-    const key = view === 'weekly' ? 'weeks' : 'months';
-    const cols = rows[0].pr[key];
-    head = cols.map((w) => `<th title="${esc(shortDate(w.from))}~${esc(shortDate(w.to))}">${view === 'weekly' ? `${w.index}주` : esc(w.label)}</th>`).join('');
-    body = rows.map((r) => `<tr><td>${esc(r.name)}</td>${r.pr[key].map((w) => {
+    const cols = rows[0].pr.weeks;
+    head = cols.map((w) => `<th title="${esc(shortDate(w.from))}~${esc(shortDate(w.to))}">${w.index}주</th>`).join('');
+    body = rows.map((r) => `<tr><td>${esc(r.name)}</td>${r.pr.weeks.map((w) => {
       const fut = w.from > ref;
       return `<td><span class="m ${cls(w.count, w.goal, fut)}" style="width:auto;padding:0 6px">${fut ? '-' : `${w.count}/${w.goal}`}</span></td>`;
     }).join('')}</tr>`).join('');
@@ -317,12 +321,7 @@ function visitRange() {
   const c = cohort();
   const t = today();
   if (!c) return { from: addDays(t, -29), to: t };
-  return { from: c.startDate, to: t < c.startDate ? c.startDate : t > c.endDate ? c.endDate : t };
-}
-
-function deltaHTML(d) {
-  if (d == null) return '-';
-  return `<span class="delta ${d >= 0 ? 'up' : 'down'}">${d >= 0 ? '▲' : '▼'} ${Math.abs(d).toLocaleString()}</span>`;
+  return { from: c.startDate, to: c.endDate }; // 챌린지 기간 전체 — 아직 오지 않은 날은 빈칸
 }
 
 function renderVisits() {
@@ -332,21 +331,20 @@ function renderVisits() {
   const series = visitSeries(visits, from, to);
   const st = seriesStats(series);
   $('#vTiles').innerHTML = `
-    <div class="tile"><div class="lbl">최근 기록</div><div class="val">${st.last == null ? '-' : st.last.toLocaleString()}<small> 명</small></div></div>
-    <div class="tile"><div class="lbl">직전 대비</div><div class="val">${deltaHTML(st.delta)}</div></div>
+    <div class="tile"><div class="lbl">현재 일방문자수${st.lastDate ? ` <span class="faint">(${shortDate(st.lastDate)})</span>` : ''}</div><div class="val">${st.last == null ? '-' : st.last.toLocaleString()}<small> 명</small></div></div>
     <div class="tile"><div class="lbl">평균</div><div class="val">${st.avg == null ? '-' : st.avg.toLocaleString()}<small> 명</small></div></div>
     <div class="tile"><div class="lbl">최고</div><div class="val">${st.max == null ? '-' : st.max.toLocaleString()}<small> 명</small></div></div>`;
-  $('#vChart').innerHTML = lineChart(series, { label: '방문자' });
+  $('#vChart').innerHTML = lineChart(series, { label: '방문자', today: today() });
 
   const rows = participants().map((p) => {
     const s = visitSeries(S.visits.filter((v) => v.uid === p.uid), from, to);
     return Object.assign({ p }, seriesStats(s));
   });
   $('#vTable').innerHTML = !rows.length ? '<div class="empty">참여자가 없습니다.</div>' : `
-    <table><thead><tr><th>이름</th><th>블로그</th><th class="num">최근</th><th class="num">직전 대비</th><th class="num">평균</th><th class="num">최고</th><th class="num">기록 일수</th><th></th></tr></thead>
+    <table><thead><tr><th>이름</th><th>블로그</th><th class="num">현재</th><th class="num">평균</th><th class="num">최고</th><th class="num">기록 일수</th><th></th></tr></thead>
     <tbody>${rows.map((r) => `<tr><td>${esc(r.p.name)}${tag(r.p)}</td>
       <td>${blogCell(r.p.member)}</td>
-      <td class="num">${r.last == null ? '-' : r.last.toLocaleString()}</td><td class="num">${deltaHTML(r.delta)}</td>
+      <td class="num">${r.last == null ? '-' : r.last.toLocaleString()}</td>
       <td class="num">${r.avg == null ? '-' : r.avg.toLocaleString()}</td><td class="num">${r.max == null ? '-' : r.max.toLocaleString()}</td>
       <td class="num">${r.n}</td><td><button class="btn sm" type="button" data-vsel="${esc(r.p.uid)}">그래프</button>
         ${r.p.member && naverBlogId(r.p.member.blogUrl) ? `<button class="btn sm" type="button" data-vsync="${esc(r.p.uid)}" ${S.apiEnabled ? '' : 'disabled'}>🔄</button>` : ''}</td></tr>`).join('')}</tbody></table>`;
@@ -553,9 +551,8 @@ function fillCohortForms() {
     $('#cName').value = c.name || '';
     $('#cStart').value = c.startDate || '';
     $('#cEnd').value = c.endDate || '';
-    $('#cDaily').value = g.daily;
     $('#cWeekly').value = g.weekly;
-    $('#cMonthly').value = g.monthly;
+    $('#cTotal').value = g.total;
     const active = c.id === S.meta.activeCohortId;
     $('#activeMark').innerHTML = active ? '<span class="badge ok">활성 기수</span>' : '<span class="badge">비활성</span>';
     $('#cActivate').hidden = active;
@@ -566,9 +563,8 @@ function fillCohortForms() {
   $('#nName').value = `${S.cohorts.length + 1}기`;
   $('#nStart').value = start;
   $('#nEnd').value = addDays(start, 27);
-  $('#nDaily').value = g.daily;
   $('#nWeekly').value = g.weekly;
-  $('#nMonthly').value = g.monthly;
+  $('#nTotal').value = g.total;
   $('#nMove').parentElement.hidden = !c;
   $('#wipeBtn').disabled = !c;
   $('#delCohortBtn').disabled = !c;
@@ -579,7 +575,7 @@ function readCohortForm(p) {
     name: $(`#${p}Name`).value.trim().slice(0, 30),
     startDate: $(`#${p}Start`).value,
     endDate: $(`#${p}End`).value,
-    goals: normalizeGoals({ daily: $(`#${p}Daily`).value, weekly: $(`#${p}Weekly`).value, monthly: $(`#${p}Monthly`).value })
+    goals: normalizeGoals({ weekly: $(`#${p}Weekly`).value, total: $(`#${p}Total`).value })
   };
   if (!data.name) throw new Error('기수 이름을 입력해 주세요.');
   if (!isISODate(data.startDate) || !isISODate(data.endDate)) throw new Error('시작일과 종료일을 입력해 주세요.');
@@ -726,6 +722,7 @@ async function boot() {
   S.me = profile;
   $('#who').textContent = `${profile.loginId} 님`;
   await loadAll();
+  installTooltips();
   showTab(S.cohorts.length ? (store.get('tab') || 'progress') : 'cohorts');
   $('#main').hidden = false;
 }

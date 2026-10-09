@@ -43,8 +43,8 @@
           <label class="field"><span>정렬</span>
             <select id="sortSel">
               <option value="name">이름순</option>
-              <option value="rate">달성률 높은순</option>
-              <option value="rateAsc">달성률 낮은순</option>
+              <option value="rate">진행률 높은순</option>
+              <option value="rateAsc">진행률 낮은순</option>
               <option value="total">포스팅 많은순</option>
             </select>
           </label>
@@ -57,17 +57,16 @@
         <h2>🗓 기간별 매트릭스
           <span class="right">
             <span class="seg" role="radiogroup" aria-label="보기 단위">
-              <label><input type="radio" name="mview" value="daily" checked>데일리</label>
-              <label><input type="radio" name="mview" value="weekly">위클리</label>
-              <label><input type="radio" name="mview" value="monthly">먼슬리</label>
+              <label><input type="radio" name="mview" value="daily" checked>일별</label>
+              <label><input type="radio" name="mview" value="weekly">주별</label>
             </span>
           </span>
         </h2>
         <div class="table-wrap" id="matrix"></div>
         <div class="legend">
-          <span><i style="background:var(--ok)"></i>목표 달성</span>
-          <span><i style="background:var(--warn-soft);border:1px solid var(--warn)"></i>일부</span>
-          <span><i style="background:var(--bad-soft)"></i>미달</span>
+          <span><i style="background:var(--ok)"></i>포스팅함 · 주 목표 달성</span>
+          <span><i style="background:var(--warn-soft);border:1px solid var(--warn)"></i>주 목표 일부</span>
+          <span><i style="background:var(--bad-soft)"></i>없음</span>
           <span><i style="background:var(--surface-2);border:1px solid var(--border)"></i>예정</span>
         </div>
       </div>
@@ -172,11 +171,10 @@
               <label class="field grow"><span>종료일</span><input type="date" id="cEnd" required></label>
             </div>
             <div class="row" style="margin-top:10px">
-              <label class="field grow"><span>데일리 목표 (개/일)</span><input type="number" id="cDaily" min="1" required></label>
               <label class="field grow"><span>위클리 목표 (개/주)</span><input type="number" id="cWeekly" min="1" required></label>
-              <label class="field grow"><span>먼슬리 목표 (개/월)</span><input type="number" id="cMonthly" min="1" required></label>
+              <label class="field grow"><span>챌린지 목표 (개)</span><input type="number" id="cTotal" min="1" required></label>
             </div>
-            <p class="faint">기간에 일부만 걸친 주·월은 걸친 날 수만큼 목표가 비례해서 줄어듭니다.</p>
+            <p class="faint">챌린지 목표는 기간 전체 동안 올릴 포스팅 개수입니다. 기간에 일부만 걸친 주는 걸친 날 수만큼 위클리 목표가 비례해서 줄어듭니다.</p>
             <div class="row">
               <button class="btn primary" id="cSave" type="submit">저장</button>
               <button class="btn" id="cActivate" type="button">챌린지원에게 보이는 활성 기수로 지정</button>
@@ -194,9 +192,8 @@
               <label class="field grow"><span>종료일</span><input type="date" id="nEnd" required></label>
             </div>
             <div class="row" style="margin-top:10px">
-              <label class="field grow"><span>데일리</span><input type="number" id="nDaily" min="1" required></label>
-              <label class="field grow"><span>위클리</span><input type="number" id="nWeekly" min="1" required></label>
-              <label class="field grow"><span>먼슬리</span><input type="number" id="nMonthly" min="1" required></label>
+              <label class="field grow"><span>위클리 목표 (개/주)</span><input type="number" id="nWeekly" min="1" required></label>
+              <label class="field grow"><span>챌린지 목표 (개)</span><input type="number" id="nTotal" min="1" required></label>
             </div>
             <label class="faint" style="display:block;margin-top:10px"><input type="checkbox" id="nActivate" checked> 만들자마자 활성 기수로 지정</label>
             <label class="faint" style="display:block"><input type="checkbox" id="nMove"> 지금 보고 있는 기수의 챌린지원을 새 기수로 옮기기 (계정 유지)</label>
