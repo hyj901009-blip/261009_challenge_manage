@@ -4,7 +4,8 @@ rules_version = '2';
 // Firebase 콘솔 → Firestore Database → 규칙 탭에 이 파일 내용을 그대로 붙여 넣고 [게시]하세요.
 //
 // 원칙
-//  - 관리자(admins/{uid} 문서가 있는 계정)는 모든 데이터를 읽고 쓸 수 있다.
+//  - 관리자(아래 isAdmin() 목록의 Google 계정)는 모든 데이터를 읽고 쓸 수 있다.
+//    ⚠️ 관리자를 바꾸면 js/config.js 의 APP.adminEmails 도 똑같이 바꾼다.
 //  - 챌린지원(members/{uid})은 "자기 것"만 읽고, 정해진 필드만 쓸 수 있다.
 //  - 그 외(로그인만 한 낯선 계정)는 아무것도 못 한다.
 service cloud.firestore {
@@ -13,31 +14,16 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function uid() { return request.auth.uid; }
     function docPath(col, id) { return /databases/$(database)/documents/$(col)/$(id); }
-    function isAdmin() { return signedIn() && exists(docPath('admins', uid())); }
+    function isAdmin() {
+      return signedIn()
+        && request.auth.token.email_verified == true
+        && request.auth.token.firebase.sign_in_provider == 'google.com'
+        && request.auth.token.email in ['hyj901009@gmail.com'];
+    }
     function isMember() { return signedIn() && exists(docPath('members', uid())); }
     function myCohort() { return get(docPath('members', uid())).data.cohortId; }
     function changedOnly(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
     function isStr(v, max) { return v is string && v.size() <= max; }
-
-    // 최초 관리자 1회 생성용 표식 — 로그인 화면이 "최초 설정" 버튼을 보일지 판단하려고 누구나 읽는다
-    match /setup/admin {
-      allow read: if true;
-      allow create: if signedIn()
-        && request.resource.data.uid == uid()
-        && existsAfter(docPath('admins', uid()));
-      allow update, delete: if false;
-    }
-
-    match /admins/{adminId} {
-      allow read: if signedIn() && (adminId == uid() || isAdmin());
-      allow create: if isAdmin()
-        // 최초 관리자: 아직 setup/admin 이 없고, 같은 일괄 쓰기에서 setup/admin 을 자기 uid 로 만든다
-        || (signedIn() && adminId == uid()
-            && !exists(docPath('setup', 'admin'))
-            && getAfter(docPath('setup', 'admin')).data.uid == uid());
-      allow update: if isAdmin();
-      allow delete: if isAdmin() && adminId != uid();
-    }
 
     match /meta/{docId} {
       allow read: if isAdmin() || isMember();

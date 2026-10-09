@@ -4,7 +4,7 @@ import {
   logout, authErrorMessage, getAppMeta, setActiveCohort, listCohorts, createCohort, updateCohort, wipeCohortData, deleteCohort,
   listMembers, createMember, updateMember, deleteMember, resetPasswordViaApi, isAdminApiEnabled,
   listPostsByCohort, setPostStatus, deletePost, listCommentsByCohort, addComment, editComment, deleteComment,
-  listVisitsByCohort, listAdmins, createAdmin
+  listVisitsByCohort
 } from './firebase.js';
 import {
   todayISO, addDays, computeProgress, shortDate, isISODate, normalizeGoals, normalizeUrl, normalizeLoginId,
@@ -16,7 +16,7 @@ import {
 
 const S = {
   user: null, me: null, apiEnabled: false,
-  cohorts: [], meta: {}, cohortId: '', members: [], admins: [],
+  cohorts: [], meta: {}, cohortId: '', members: [],
   posts: [], comments: [], visits: []
 };
 const today = () => todayISO(APP.timezone);
@@ -624,18 +624,8 @@ $('#delCohortBtn').addEventListener('click', async (ev) => {
 });
 
 function renderAdmins() {
-  $('#adminList').innerHTML = S.admins.map((a) => `<span class="badge" style="margin-right:4px">${esc(a.loginId)}${a.id === S.user.uid ? ' (나)' : ''}</span>`).join('');
+  $('#adminList').innerHTML = APP.adminEmails.map((e) => `<span class="badge" style="margin-right:4px">${esc(e)}${e.toLowerCase() === String(S.user.email).toLowerCase() ? ' (나)' : ''}</span>`).join('');
 }
-$('#aForm').addEventListener('submit', async (ev) => {
-  ev.preventDefault();
-  await busy($('#aBtn'), async () => {
-    await createAdmin($('#aId').value, $('#aPw').value);
-    S.admins = await listAdmins();
-    renderAdmins();
-    $('#aForm').reset();
-    toast('관리자를 추가했습니다.', 'ok');
-  }, authErrorMessage);
-});
 
 /* ── 기수 선택 / 로딩 ─────────────────────────────────── */
 function renderCohortSelect() {
@@ -681,10 +671,10 @@ async function selectCohort(id) {
 $('#cohortSel').addEventListener('change', (ev) => busy(ev.target, () => selectCohort(ev.target.value), authErrorMessage));
 
 async function loadAll(preferId) {
-  const [cohorts, meta, members, admins, apiEnabled] = await Promise.all([
-    listCohorts(), getAppMeta(), listMembers(), listAdmins(), isAdminApiEnabled()
+  const [cohorts, meta, members, apiEnabled] = await Promise.all([
+    listCohorts(), getAppMeta(), listMembers(), isAdminApiEnabled()
   ]);
-  Object.assign(S, { cohorts, meta, members, admins, apiEnabled });
+  Object.assign(S, { cohorts, meta, members, apiEnabled });
   const ids = cohorts.map((c) => c.id);
   const pick = [preferId, store.get('cohort'), meta.activeCohortId, ids[0]].find((x) => x && ids.includes(x)) || '';
   renderAdmins();
