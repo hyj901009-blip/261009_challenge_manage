@@ -5,6 +5,18 @@ import { $ } from './ui.js';
 
 $('#appTitle').textContent = APP.title;
 
+/* 챌린지원 / 관리자 탭 — 마지막으로 고른 탭을 기억하고, 주소 끝에 #admin 을 붙이면 관리자 탭으로 열린다 */
+function showLoginTab(name) {
+  document.querySelectorAll('[data-login]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.login === name)));
+  document.querySelectorAll('[data-login-panel]').forEach((p) => { p.hidden = p.dataset.loginPanel !== name; });
+  $('#loginErr').textContent = '';
+  try { localStorage.setItem('bc.loginTab', name); } catch (_) { /* 무시 */ }
+}
+document.querySelectorAll('[data-login]').forEach((b) => b.addEventListener('click', () => showLoginTab(b.dataset.login)));
+let initialTab = 'member';
+try { initialTab = localStorage.getItem('bc.loginTab') || 'member'; } catch (_) { /* 무시 */ }
+showLoginTab(location.hash === '#admin' ? 'admin' : initialTab === 'admin' ? 'admin' : 'member');
+
 async function goByRole(user, viaGoogle) {
   const { role } = await getRole(user);
   if (role === 'admin') location.replace('admin.html');
@@ -12,7 +24,7 @@ async function goByRole(user, viaGoogle) {
   else {
     await logout();
     $('#loginErr').textContent = viaGoogle
-      ? `${user.email || '이 Google 계정'}은(는) 관리자로 등록되어 있지 않습니다. 챌린지원은 위의 아이디/비밀번호로 로그인해 주세요.`
+      ? `${user.email || '이 Google 계정'}은(는) 관리자로 등록되어 있지 않습니다. 챌린지원은 [챌린지원 로그인] 탭에서 아이디/비밀번호로 로그인해 주세요.`
       : '등록되지 않은 계정입니다. 관리자에게 문의해 주세요.';
   }
 }

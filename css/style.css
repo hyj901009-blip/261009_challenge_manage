@@ -225,6 +225,9 @@ table.matrix th.today { color: var(--info); }
 .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px 16px; background: var(--header); }
 .login-card { width: 100%; max-width: 380px; }
 .login-card h1 { font-size: 22px; margin: 0 0 4px; }
+.login-tabs { display: grid; grid-template-columns: 1fr 1fr; margin: 14px 0 16px; }
+.login-tabs button { border-radius: 10px; padding: 10px 8px; }
+.g-icon { display: inline-flex; background: #fff; border-radius: 50%; padding: 3px; }
 .err { color: var(--bad); font-size: 14px; min-height: 1.4em; }
 
 /* ── 토스트 ──────────────────────────── */
