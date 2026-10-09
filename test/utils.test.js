@@ -102,3 +102,26 @@ test('방문자 시계열과 요약', () => {
   assert.deepEqual([st.last, st.prev, st.delta, st.avg, st.max, st.n], [35, 10, 25, 23, 35, 2]);
   assert.equal(seriesStats([]).last, null);
 });
+
+test('네이버 블로그 아이디 추출', async () => {
+  const { naverBlogId } = await import('../js/utils.js');
+  assert.equal(naverBlogId('https://blog.naver.com/MyBlog_01'), 'myblog_01');
+  assert.equal(naverBlogId('blog.naver.com/hong/223456789'), 'hong');
+  assert.equal(naverBlogId('https://m.blog.naver.com/hong/223456789'), 'hong');
+  assert.equal(naverBlogId('https://blog.naver.com/PostView.naver?blogId=hong&logNo=1'), 'hong');
+  assert.equal(naverBlogId('https://hong.blog.me'), 'hong');
+  assert.equal(naverBlogId('https://blog.naver.com/PostList.naver'), '');
+  assert.equal(naverBlogId('https://tistory.com/hong'), '');
+  assert.equal(naverBlogId(''), '');
+});
+
+test('네이버 방문자 XML 파싱', async () => {
+  const { parseNaverVisitors } = await import('../js/utils.js');
+  const xml = `<?xml version="1.0" encoding="utf-8"?><visitorcnts>
+    <visitorcnt id="20261008" cnt="88" /><visitorcnt cnt="120" id="20261007"/>
+    <visitorcnt id="20261009" cnt="5" /><visitorcnt id="bad" cnt="1"/></visitorcnts>`;
+  assert.deepEqual(parseNaverVisitors(xml), [
+    { date: '2026-10-07', count: 120 }, { date: '2026-10-08', count: 88 }, { date: '2026-10-09', count: 5 }
+  ]);
+  assert.deepEqual(parseNaverVisitors('<html>error</html>'), []);
+});

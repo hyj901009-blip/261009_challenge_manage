@@ -2,17 +2,18 @@
 import { APP } from './config.js';
 import {
   logout, getCohort, listMyPosts, addPost, editMyPost, deleteMyPost, listMyComments, reactToComment,
-  listMyVisits, saveVisit, deleteVisit, changeMyPassword, authErrorMessage
+  listMyVisits, saveVisit, deleteVisit, changeMyPassword, authErrorMessage,
+  isAdminApiEnabled, syncNaverVisitors
 } from './firebase.js';
 import {
-  todayISO, addDays, computeProgress, shortDate, normalizeUrl, isISODate, visitSeries, seriesStats, diffDays
+  todayISO, addDays, computeProgress, shortDate, normalizeUrl, isISODate, visitSeries, seriesStats, diffDays, naverBlogId
 } from './utils.js';
 import {
   $, $$, esc, toast, busy, requireRole, progressBlock, dayStrip, lineChart, statusBadge, fmtDateTime,
   tsMillis, reactionOf, POST_TYPE
 } from './ui.js';
 
-const S = { user: null, me: null, cohort: null, posts: [], comments: [], visits: [], editingId: null };
+const S = { user: null, me: null, cohort: null, posts: [], comments: [], visits: [], editingId: null, apiEnabled: false };
 const today = () => todayISO(APP.timezone);
 
 $$('.app-title').forEach((el) => { el.textContent = APP.title; });
@@ -286,6 +287,49 @@ $('#visitDel').addEventListener('click', async (ev) => {
   }, authErrorMessage);
 });
 
+/* ── 네이버 블로그 방문자 수 자동 가져오기 ─────────────── */
+function paintNaver() {
+  const id = naverBlogId(S.me.blogUrl);
+  $('#myBlogText').innerHTML = S.me.blogUrl
+    ? `<a href="${esc(S.me.blogUrl)}" target="_blank" rel="noopener noreferrer">${esc(S.me.blogUrl)}</a>`
+    : '아직 등록되지 않음';
+  const btn = $('#naverSync');
+  btn.disabled = !id || !S.apiEnabled;
+  let help;
+  if (!S.me.blogUrl) help = '관리자가 블로그 주소를 등록하면 네이버 블로그 방문자 수를 자동으로 가져옵니다. 그 전에는 아래에 직접 입력해 주세요.';
+  else if (!id) help = '네이버 블로그가 아니라서 자동으로 가져올 수 없습니다. 아래 [직접 입력하기]를 이용해 주세요.';
+  else if (!S.apiEnabled) help = `네이버 블로그(${id})로 인식했습니다. 서버 설정이 끝나면 자동으로 가져옵니다. 그 전에는 직접 입력해 주세요.`;
+  else help = `네이버 블로그(${id})의 최근 5일 방문자 수를 매일 자동으로 가져옵니다. 블로그의 방문자 수가 공개되어 있어야 합니다.`;
+  $('#naverHelp').textContent = help;
+  // 네이버 자동 수집이 안 되면 직접 입력 칸을 펼쳐 둔다
+  $('#manualFold').open = btn.disabled;
+}
+
+async function runNaverSync(btn, { silent } = {}) {
+  const r = silent
+    ? await syncNaverVisitors().catch((e) => { console.warn('네이버 자동 가져오기 실패', e); return null; })
+    : await busy(btn, () => syncNaverVisitors(), authErrorMessage);
+  if (!r) return;
+  const one = r.results && r.results[0];
+  if (one && one.ok) {
+    S.visits = await listMyVisits(S.user.uid);
+    renderVisits();
+    fillVisitInput();
+    if (!silent) toast(`네이버에서 ${one.days}일치 방문자 수를 가져왔습니다.`, 'ok');
+  } else if (!silent) {
+    toast((one && one.error) || '가져오지 못했습니다.', 'bad');
+  }
+}
+$('#naverSync').addEventListener('click', (ev) => runNaverSync(ev.currentTarget));
+
+/** 대시보드를 열 때 하루 한 번 조용히 가져온다 (예약 실행이 놓친 날을 보충) */
+async function autoNaverSync() {
+  if (!S.apiEnabled || !naverBlogId(S.me.blogUrl)) return;
+  const key = `bc.naverSync.${S.user.uid}`;
+  try { if (localStorage.getItem(key) === today()) return; localStorage.setItem(key, today()); } catch (_) { /* 무시 */ }
+  await runNaverSync($('#naverSync'), { silent: true });
+}
+
 /* ── 비밀번호 ─────────────────────────────────────────── */
 $('#pwForm').addEventListener('submit', async (ev) => {
   ev.preventDefault();
@@ -310,12 +354,14 @@ async function boot() {
   S.user = user;
   S.me = profile;
   $('#who').textContent = `${profile.name || profile.loginId} 님`;
-  const [cohort, posts, comments, visits] = await Promise.all([
+  const [cohort, posts, comments, visits, apiEnabled] = await Promise.all([
     getCohort(profile.cohortId),
     listMyPosts(user.uid),
     listMyComments(user.uid),
-    listMyVisits(user.uid)
+    listMyVisits(user.uid),
+    isAdminApiEnabled()
   ]);
+  S.apiEnabled = apiEnabled;
   S.cohort = cohort;
   S.posts = posts;
   S.comments = comments;
@@ -328,8 +374,10 @@ async function boot() {
   $('#vDate').max = today();
   fillVisitInput();
   paintTypeHelp();
+  paintNaver();
   renderAll();
   $('#main').hidden = false;
+  autoNaverSync();
 }
 
 boot().catch((e) => {

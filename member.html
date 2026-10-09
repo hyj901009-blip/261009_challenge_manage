@@ -110,13 +110,22 @@
     <!-- 방문자 수 -->
     <section class="card">
       <h2>👀 블로그 일 방문자 수 추이</h2>
-      <p class="faint" style="margin-top:-6px">블로그 관리 화면(통계)에 보이는 어제·오늘 방문자 수를 직접 입력해 주세요. 같은 날짜로 다시 저장하면 덮어씁니다.</p>
-      <form class="row" id="visitForm" style="margin-bottom:12px">
-        <label class="field"><span>날짜</span><input type="date" id="vDate" required></label>
-        <label class="field"><span>방문자 수</span><input type="number" id="vCount" min="0" step="1" inputmode="numeric" required style="width:140px"></label>
-        <button class="btn primary" id="visitBtn" type="submit">저장</button>
-        <button class="btn danger" id="visitDel" type="button">이 날짜 삭제</button>
-      </form>
+      <div class="row" style="margin-bottom:6px;align-items:center">
+        <span class="grow">내 블로그: <b id="myBlogText">-</b></span>
+        <button class="btn primary" id="naverSync" type="button">🔄 네이버에서 가져오기</button>
+      </div>
+      <p class="faint" id="naverHelp" style="margin:0 0 12px"></p>
+
+      <details class="fold" id="manualFold" style="margin-bottom:12px">
+        <summary>✍️ 직접 입력하기 (네이버가 아닌 블로그 등)</summary>
+        <p class="faint" style="margin:6px 0">블로그 통계 화면에 보이는 일 방문자 수를 입력해 주세요. 같은 날짜로 다시 저장하면 덮어씁니다.</p>
+        <form class="row" id="visitForm">
+          <label class="field"><span>날짜</span><input type="date" id="vDate" required></label>
+          <label class="field"><span>방문자 수</span><input type="number" id="vCount" min="0" step="1" inputmode="numeric" required style="width:140px"></label>
+          <button class="btn primary" id="visitBtn" type="submit">저장</button>
+          <button class="btn danger" id="visitDel" type="button">이 날짜 삭제</button>
+        </form>
+      </details>
       <div class="tiles" id="visitTiles"></div>
       <div id="visitChart"></div>
     </section>

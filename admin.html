@@ -102,10 +102,12 @@
     <section data-panel="visits" hidden>
       <div class="card">
         <h2>👀 블로그 일 방문자 수 추이</h2>
-        <p class="faint" style="margin-top:-6px">챌린지원이 대시보드에 직접 입력한 일 방문자 수입니다.</p>
+        <p class="faint" style="margin-top:-6px">네이버 블로그는 매일 00:10에 자동으로 가져오고, 그 밖의 블로그는 챌린지원이 직접 입력한 값입니다.</p>
         <div class="row" style="margin-bottom:12px">
           <label class="field"><span>대상</span><select id="vTarget"></select></label>
+          <button class="btn primary" id="vSyncAll" type="button">🔄 이 기수 전체 네이버에서 가져오기</button>
         </div>
+        <p class="faint" id="vSyncNote" hidden></p>
         <div class="tiles" id="vTiles"></div>
         <div id="vChart"></div>
       </div>

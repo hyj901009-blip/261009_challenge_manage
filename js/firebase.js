@@ -389,6 +389,21 @@ export async function reactToComment(id, reaction) {
   await updateDoc(ref('comments', id), { reaction: reaction || '', readAt: serverTimestamp() });
 }
 
+/* ── 네이버 블로그 방문자 수 (서버 API) ─────────────────── */
+/** body: {} 본인 / 관리자는 { cohortId } 또는 { uid }. 결과 { total, ok, failed[], results[] } */
+export async function syncNaverVisitors(body = {}) {
+  await ready();
+  const token = await auth.currentUser.getIdToken();
+  const res = await fetch('/api/naver-visitors', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `요청 실패 (${res.status})`);
+  return data;
+}
+
 /* ── 방문자 수 ──────────────────────────────────────────── */
 export async function listVisitsByCohort(cohortId) {
   await ready();
