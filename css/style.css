@@ -210,17 +210,7 @@ details.fold > summary { cursor: pointer; color: var(--text-dim); font-weight: 6
 .hero-copy h2 { font-size: 34px; letter-spacing: -.055em; line-height: 1.2; margin: 14px 0 10px; }
 .hero-copy p { font-size: 13px; margin: 0 0 18px; }
 .hero-link { display: inline-flex; align-items: center; gap: 18px; background: #191622; color: #fff; padding: 10px 16px; border-radius: 24px; text-decoration: none; font-size: 13px; font-weight: 600; }
-.hero-art { position: absolute; right: 20px; top: 35px; width: 160px; height: 190px; z-index: 0; }
-.hero-art i { position: absolute; display: block; }
-.art-ring { width: 98px; height: 98px; border: 26px solid #ffb84f; border-radius: 50%; top: 0; right: 4px; transform: rotate(-28deg) scaleX(.8); box-shadow: inset 6px 5px 8px #c97c2b, 9px 12px 12px #6c519e40; }
-.art-block { width: 92px; height: 85px; border-radius: 29px; top: 67px; left: 6px; transform: rotate(-19deg); background: linear-gradient(135deg,#5b6562,#20272a); box-shadow: 10px 16px 18px #4d397d40; }
-.art-orb { width: 74px; height: 74px; border-radius: 25px; right: 0; bottom: 4px; transform: rotate(20deg); background: linear-gradient(135deg,#ffe6d9,#c19fa2); box-shadow: 8px 10px 12px #513c7540; }
-.art-spark { left: 8px; top: 3px; font-size: 34px; color: #fff2ac; }
 .login-intro { margin: 18px 0; font-size: 25px; line-height: 1.4; letter-spacing: -.05em; }
-.login-art { position: relative; height: 94px; margin-bottom: 24px; border-radius: 20px; background: #bba4fa; overflow: hidden; }
-.login-art i { position: absolute; width: 84px; height: 84px; border: 22px solid #ffbd5d; border-radius: 50%; left: 20%; top: 20px; transform: rotate(-25deg) scaleX(.8); box-shadow: inset 4px 4px 7px #b77f31; }
-.login-art b { position: absolute; left: 50%; top: 6px; font-size: 60px; color: #272532; }
-.login-art span { position: absolute; width: 56px; height: 56px; right: 12%; bottom: -7px; border-radius: 20px; transform: rotate(25deg); background: linear-gradient(135deg,#fff1e0,#d6a9ad); }
 :where(a, button, summary):focus-visible { outline: 3px solid var(--info); outline-offset: 4px; }
 .seg input { display: inline-block; width: 14px; height: 14px; accent-color: var(--accent); }
 .seg label:focus-within { outline: 2px solid var(--info); outline-offset: -3px; }
@@ -272,7 +262,6 @@ input[type='text'], input[type='password'], input[type='url'], input[type='date'
   .hero-copy { max-width: 78%; }
   .hero-copy h2 { font-size: clamp(27px, 7.5vw, 36px); }
   .hero-copy p { max-width: 170px; font-size: 12px; }
-  .hero-art { right: -24px; top: 30px; transform: scale(.78); transform-origin: right center; }
   .tiles { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
   .strip { grid-template-columns: repeat(7,minmax(0,1fr)); gap: 6px; }
   .cell { border-radius: 14px; font-size: 12px; }
@@ -297,13 +286,23 @@ input[type='text'], input[type='password'], input[type='url'], input[type='date'
   .challenge-hero { padding: 36px 40px; min-height: 280px; }
   .hero-copy { max-width: 65%; }
   .hero-copy h2 { font-size: 44px; }
-  .hero-art { right: 60px; top: 40px; transform: scale(1.15); }
   .tile { padding: 22px; min-height: 116px; }
   .cell { border-radius: 10px; }
   .login-card { padding: 36px; max-width: 460px; }
   .login-card h1 { font-size: 24px; }
   .login-intro { font-size: 30px; }
-  .login-art { height: 120px; }
   .mobile-dock { max-width: 480px; }
   #main, #writePost, #feedback, #myPosts { scroll-margin-top: 110px; }
+}
+
+/* Original blogging companion: preserve the complete illustration at every size. */
+.challenge-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .9fr); gap: 28px; }
+.challenge-hero .hero-copy { max-width: none; min-width: 0; }
+.hero-mascot, .login-mascot { display: block; width: 100%; height: auto; object-fit: contain; border-radius: 24px; background: #eee7fb; }
+.hero-mascot { max-width: 420px; justify-self: end; }
+.login-mascot { margin: 0 0 24px; }
+@media (max-width: 700px) {
+  .challenge-hero { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .hero-mascot { max-width: 300px; justify-self: center; }
+  .hero-copy p { max-width: none; }
 }
