@@ -3,9 +3,11 @@
  * Spark(무료) 요금제에서 쓰는 것만 사용: Authentication(이메일/비밀번호) + Cloud Firestore.
  * Cloud Functions·Storage 는 쓰지 않는다.
  *
+ * 로그인
+ *   관리자   : Google 로그인. APP.adminEmails 에 있는 계정만 관리자 (firestore.rules 에도 같은 목록)
+ *   챌린지원 : 관리자가 만든 아이디/비밀번호 (Firebase 이메일/비밀번호 로그인)
+ *
  * 컬렉션 구조
- *   setup/admin         { uid, createdAt }                     ← 최초 관리자 생성 여부 (1회용)
- *   admins/{uid}        { loginId, createdAt }
  *   meta/app            { activeCohortId }
  *   cohorts/{id}        { name, startDate, endDate, goals:{daily,weekly,monthly}, status, createdAt }
  *   members/{uid}       { loginId, name, cohortId, blogUrl, createdAt }
@@ -17,7 +19,8 @@
 import { initializeApp, deleteApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider, connectAuthEmulator
+  signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider, connectAuthEmulator,
+  GoogleAuthProvider, signInWithPopup
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import {
   getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc,
@@ -85,7 +88,10 @@ export function authErrorMessage(err) {
   if (/too-many-requests/.test(code)) return '로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.';
   if (/email-already-in-use/.test(code)) return '이미 사용 중인 아이디입니다.';
   if (/weak-password/.test(code)) return '비밀번호는 6자 이상이어야 합니다.';
-  if (/operation-not-allowed/.test(code)) return 'Firebase 콘솔에서 [Authentication → 이메일/비밀번호] 로그인을 사용 설정해 주세요.';
+  if (/operation-not-allowed/.test(code)) return 'Firebase 콘솔 [Authentication → 로그인 방법]에서 이메일/비밀번호와 Google 로그인을 사용 설정해 주세요.';
+  if (/unauthorized-domain/.test(code)) return '이 도메인이 Firebase 승인된 도메인에 없습니다. [Authentication → 설정 → 승인된 도메인]에 추가해 주세요.';
+  if (/popup-closed-by-user|cancelled-popup-request/.test(code)) return '로그인 창이 닫혔습니다.';
+  if (/popup-blocked/.test(code)) return '팝업이 차단되었습니다. 브라우저에서 이 사이트의 팝업을 허용해 주세요.';
   if (/requires-recent-login/.test(code)) return '보안을 위해 다시 로그인한 뒤 시도해 주세요.';
   if (/network-request-failed/.test(code)) return '네트워크 연결을 확인해 주세요.';
   if (/permission-denied/.test(code)) return '권한이 없습니다. (Firestore 보안 규칙을 배포했는지 확인해 주세요)';
@@ -101,6 +107,21 @@ export async function login(loginId, password) {
   return signInWithEmailAndPassword(auth, await loginIdToEmail(id), password);
 }
 
+/** 관리자 Google 로그인 */
+export async function loginWithGoogle() {
+  await ready();
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+  return signInWithPopup(auth, provider);
+}
+
+export function isAdminUser(user) {
+  const email = String((user && user.email) || '').toLowerCase();
+  return !!user && !!user.emailVerified
+    && (user.providerData || []).some((p) => p.providerId === 'google.com')
+    && APP.adminEmails.map((e) => e.toLowerCase()).includes(email);
+}
+
 export async function logout() {
   await ready();
   return signOut(auth);
@@ -114,12 +135,11 @@ export async function currentUser() {
   });
 }
 
-/** uid 의 역할: { role:'admin'|'member'|null, profile } */
-export async function getRole(uid) {
+/** 로그인한 사용자의 역할: { role:'admin'|'member'|null, profile } */
+export async function getRole(user) {
   await ready();
-  const a = await getDoc(ref('admins', uid));
-  if (a.exists()) return { role: 'admin', profile: withId(a) };
-  const m = await getDoc(ref('members', uid));
+  if (isAdminUser(user)) return { role: 'admin', profile: { id: user.uid, loginId: user.email, name: user.displayName || user.email } };
+  const m = await getDoc(ref('members', user.uid));
   if (m.exists()) return { role: 'member', profile: withId(m) };
   return { role: null, profile: null };
 }
@@ -135,7 +155,7 @@ export async function changeMyPassword(currentPw, newPw) {
 }
 
 /**
- * 관리자가 다른 사람 계정을 만든다. 기본 앱으로 만들면 관리자 본인이 로그아웃되므로
+ * 관리자가 챌린지원 계정을 만든다. 기본 앱으로 만들면 관리자 본인이 로그아웃되므로
  * 잠깐 쓰고 버리는 보조 앱 인스턴스에서 계정을 만든다(서버 없이 Spark 요금제에서 동작).
  */
 async function createAuthAccount(loginId, password) {
@@ -153,26 +173,6 @@ async function createAuthAccount(loginId, password) {
   } finally {
     await deleteApp(sec);
   }
-}
-
-/* ── 최초 관리자 ─────────────────────────────────────────── */
-export async function isSetupDone() {
-  await ready();
-  return (await getDoc(ref('setup', 'admin'))).exists();
-}
-
-export async function createFirstAdmin(loginId, password) {
-  await ready();
-  const id = normalizeLoginId(loginId);
-  const msg = validateLoginId(id) || validatePassword(password);
-  if (msg) throw new Error(msg);
-  const cred = await createUserWithEmailAndPassword(auth, await loginIdToEmail(id), password);
-  const uid = cred.user.uid;
-  const batch = writeBatch(db);
-  batch.set(ref('admins', uid), { loginId: id, createdAt: serverTimestamp() });
-  batch.set(ref('setup', 'admin'), { uid, createdAt: serverTimestamp() });
-  await batch.commit();
-  return uid;
 }
 
 /* ── 서버 API (Vercel 함수, 선택) — 비밀번호 재설정·계정 삭제 ─────── */
@@ -206,18 +206,6 @@ export const resetPasswordViaApi = (uid, password) => {
   if (msg) return Promise.reject(new Error(msg));
   return adminApi({ action: 'resetPassword', uid, password });
 };
-
-/* ── 관리자 계정 ─────────────────────────────────────────── */
-export async function listAdmins() {
-  await ready();
-  return (await getDocs(col('admins'))).docs.map(withId);
-}
-
-export async function createAdmin(loginId, password) {
-  const { uid, loginId: id } = await createAuthAccount(loginId, password);
-  await setDoc(ref('admins', uid), { loginId: id, createdAt: serverTimestamp() });
-  return uid;
-}
 
 /* ── 앱 메타 / 기수 ─────────────────────────────────────── */
 export async function getAppMeta() {

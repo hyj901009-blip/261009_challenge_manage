@@ -20,7 +20,11 @@ export const APP = {
   title: '블로그 챌린지',
   timezone: 'Asia/Seoul',
 
-  // 한글 아이디를 Firebase 이메일/비밀번호 로그인에 쓰기 위한 "내부용 가짜 메일 도메인".
+  // 관리자 = 이 목록에 있는 Google 계정. (Google 로그인으로 들어옴)
+  // ⚠️ 바꾸면 firestore.rules 의 isAdmin() 목록도 똑같이 바꿔야 합니다. 서버 API(api/admin-users.js)는 이 값을 그대로 씁니다.
+  adminEmails: ['hyj901009@gmail.com'],
+
+  // 챌린지원의 한글 아이디를 Firebase 이메일/비밀번호 로그인에 쓰기 위한 "내부용 가짜 메일 도메인".
   // 아이디는 해시로 바뀌어 <해시>@이 도메인 형태의 계정이 됩니다. 실제로 메일이 가지 않습니다.
   // ⚠️ 운영을 시작한 뒤 바꾸면 기존 계정이 모두 로그인되지 않습니다.
   idEmailDomain: 'challenge.example.com',

@@ -148,7 +148,7 @@ export async function requireRole(role) {
   }
   const user = await currentUser();
   if (!user) { location.replace('index.html'); throw new Error('로그인 필요'); }
-  const r = await getRole(user.uid);
+  const r = await getRole(user);
   if (r.role !== role) {
     location.replace(r.role === 'admin' ? 'admin.html' : r.role === 'member' ? 'member.html' : 'index.html');
     throw new Error('권한 없음');
