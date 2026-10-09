@@ -295,7 +295,7 @@ input[type='text'], input[type='password'], input[type='url'], input[type='date'
   #main, #writePost, #feedback, #myPosts { scroll-margin-top: 110px; }
 }
 
-/* Original blogging companion: preserve the complete illustration at every size. */
+/* Blogging companion artwork and responsive banner layout. */
 .challenge-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .9fr); gap: 28px; }
 .challenge-hero .hero-copy { max-width: none; min-width: 0; }
 .hero-mascot, .login-mascot { display: block; width: 100%; height: auto; object-fit: contain; border-radius: 24px; background: #eee7fb; }
@@ -303,7 +303,7 @@ input[type='text'], input[type='password'], input[type='url'], input[type='date'
 .login-mascot { margin: 0 0 24px; }
 @media (max-width: 700px) {
   .challenge-hero { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 12px; min-height: 0; padding: 20px 16px; }
-  .hero-mascot { max-width: 180px; justify-self: end; border-radius: 16px; }
+  .hero-mascot { max-width: 180px; aspect-ratio: 1; object-fit: cover; object-position: center; justify-self: end; border-radius: 16px; }
   .hero-copy h2 { font-size: clamp(22px, 5.8vw, 32px); margin: 0 0 10px; }
   .hero-copy p { max-width: none; }
   .hero-link { gap: 6px; padding: 10px 12px; font-size: 11px; white-space: nowrap; }
