@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#102d84">
+  <title>블로그 챌린지 · 내 대시보드</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✍️</text></svg>">
+</head>
+<body>
+  <header class="top">
+    <div class="top-in">
+      <h1>✍️ <span class="app-title">블로그 챌린지</span><span class="tag" id="cohortTag" hidden></span></h1>
+      <span class="spacer"></span>
+      <span class="who" id="who"></span>
+      <button class="btn sm" id="logoutBtn" type="button">로그아웃</button>
+    </div>
+  </header>
+
+  <main class="wrap" id="main" hidden>
+    <div class="notice" id="noCohort" hidden>아직 참여 기수가 지정되지 않았습니다. 관리자에게 문의해 주세요.</div>
+
+    <!-- 미션 진척 -->
+    <section class="card" id="progressCard">
+      <h2>📈 미션 진척 <span class="right faint" id="periodText"></span></h2>
+      <div class="tiles" id="summaryTiles"></div>
+      <div class="grid3" id="progBlocks"></div>
+      <h3>날짜별 기록</h3>
+      <div id="strip"></div>
+      <div class="legend">
+        <span><i style="background:var(--ok)"></i>목표 달성</span>
+        <span><i style="background:var(--warn-soft);border:1px solid var(--warn)"></i>일부</span>
+        <span><i style="background:var(--bad-soft)"></i>미등록</span>
+        <span><i style="background:var(--surface-2);border:1px solid var(--border)"></i>예정</span>
+      </div>
+      <details class="fold" style="margin-top:12px">
+        <summary>주차별 · 월별 상세 보기</summary>
+        <div class="grid2" style="margin-top:10px">
+          <div class="table-wrap" id="weekTable"></div>
+          <div class="table-wrap" id="monthTable"></div>
+        </div>
+      </details>
+    </section>
+
+    <div class="grid2">
+      <!-- 블로그 링크 등록 -->
+      <section class="card">
+        <h2>🔗 블로그 글 등록 <span class="right"><button class="btn sm" id="cancelEdit" type="button" hidden>수정 취소</button></span></h2>
+        <form id="postForm">
+          <div class="field" style="margin-bottom:12px">
+            <div class="seg" role="radiogroup" aria-label="등록 방식">
+              <label><input type="radio" name="ptype" value="review" checked>📝 검토 요청</label>
+              <label><input type="radio" name="ptype" value="free">🚀 자유 등록</label>
+            </div>
+            <p class="faint" id="typeHelp" style="margin:6px 0 0"></p>
+          </div>
+          <label class="field"><span>블로그 글 주소 (URL)</span>
+            <input type="text" inputmode="url" autocomplete="off" id="pUrl" placeholder="https://blog.naver.com/..." required>
+          </label>
+          <label class="field"><span>글 제목</span>
+            <input type="text" id="pTitle" maxlength="120" placeholder="포스팅 제목">
+          </label>
+          <div class="row">
+            <label class="field grow"><span>발행일 (미션 날짜)</span>
+              <input type="date" id="pDate" required>
+            </label>
+          </div>
+          <label class="field" style="margin-top:10px"><span>관리자에게 한마디 (선택)</span>
+            <textarea id="pMemo" maxlength="300" placeholder="검토받고 싶은 부분 등을 적어 주세요."></textarea>
+          </label>
+          <button class="btn primary block" id="postBtn" type="submit">등록하기</button>
+        </form>
+      </section>
+
+      <!-- 받은 코멘트 -->
+      <section class="card">
+        <h2>💬 받은 코멘트 <span class="badge new" id="unreadBadge" hidden></span>
+          <span class="right"><label class="faint"><input type="checkbox" id="onlyUnread"> 안 읽은 것만</label></span></h2>
+        <div class="list-scroll" id="commentFeed" style="max-height:520px"></div>
+      </section>
+    </div>
+
+    <!-- 내 포스팅 -->
+    <section class="card">
+      <h2>🗂 내 포스팅
+        <span class="right">
+          <select id="postFilter" style="width:auto;padding:5px 10px">
+            <option value="all">전체</option>
+            <option value="review">검토 요청</option>
+            <option value="free">자유 등록</option>
+          </select>
+        </span>
+      </h2>
+      <div class="list-scroll" id="postList"></div>
+    </section>
+
+    <!-- 방문자 수 -->
+    <section class="card">
+      <h2>👀 블로그 일 방문자 수 추이</h2>
+      <p class="faint" style="margin-top:-6px">블로그 관리 화면(통계)에 보이는 어제·오늘 방문자 수를 직접 입력해 주세요. 같은 날짜로 다시 저장하면 덮어씁니다.</p>
+      <form class="row" id="visitForm" style="margin-bottom:12px">
+        <label class="field"><span>날짜</span><input type="date" id="vDate" required></label>
+        <label class="field"><span>방문자 수</span><input type="number" id="vCount" min="0" step="1" inputmode="numeric" required style="width:140px"></label>
+        <button class="btn primary" id="visitBtn" type="submit">저장</button>
+        <button class="btn danger" id="visitDel" type="button">이 날짜 삭제</button>
+      </form>
+      <div class="tiles" id="visitTiles"></div>
+      <div id="visitChart"></div>
+    </section>
+
+    <!-- 계정 -->
+    <section class="card">
+      <details class="fold">
+        <summary>🔒 비밀번호 변경</summary>
+        <form id="pwForm" style="margin-top:10px;max-width:360px">
+          <label class="field"><span>현재 비밀번호</span><input type="password" id="pwCur" autocomplete="current-password" required></label>
+          <label class="field"><span>새 비밀번호 (6자 이상)</span><input type="password" id="pwNew" autocomplete="new-password" required></label>
+          <label class="field"><span>새 비밀번호 확인</span><input type="password" id="pwNew2" autocomplete="new-password" required></label>
+          <button class="btn" id="pwBtn" type="submit">변경하기</button>
+        </form>
+      </details>
+    </section>
+  </main>
+
+  <script type="module" src="js/member.js"></script>
+</body>
+</html>

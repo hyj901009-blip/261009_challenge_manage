@@ -1,0 +1,19 @@
+{
+  "name": "blog-challenge-manager",
+  "private": true,
+  "version": "1.0.0",
+  "description": "블로그 챌린지 관리 앱 (정적 사이트 + Firebase Spark + Vercel 서버리스 함수)",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev": "vercel dev",
+    "serve": "npx --yes http-server -p 3000 -c-1",
+    "test": "node --test test/*.test.js",
+    "emulators": "npx --yes firebase-tools@15 emulators:start --only auth,firestore --project demo-blog-challenge"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.5.0"
+  }
+}

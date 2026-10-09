@@ -1,0 +1,107 @@
+rules_version = '2';
+
+// 블로그 챌린지 — Firestore 보안 규칙
+// Firebase 콘솔 → Firestore Database → 규칙 탭에 이 파일 내용을 그대로 붙여 넣고 [게시]하세요.
+//
+// 원칙
+//  - 관리자(admins/{uid} 문서가 있는 계정)는 모든 데이터를 읽고 쓸 수 있다.
+//  - 챌린지원(members/{uid})은 "자기 것"만 읽고, 정해진 필드만 쓸 수 있다.
+//  - 그 외(로그인만 한 낯선 계정)는 아무것도 못 한다.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function uid() { return request.auth.uid; }
+    function docPath(col, id) { return /databases/$(database)/documents/$(col)/$(id); }
+    function isAdmin() { return signedIn() && exists(docPath('admins', uid())); }
+    function isMember() { return signedIn() && exists(docPath('members', uid())); }
+    function myCohort() { return get(docPath('members', uid())).data.cohortId; }
+    function changedOnly(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
+    function isStr(v, max) { return v is string && v.size() <= max; }
+
+    // 최초 관리자 1회 생성용 표식 — 로그인 화면이 "최초 설정" 버튼을 보일지 판단하려고 누구나 읽는다
+    match /setup/admin {
+      allow read: if true;
+      allow create: if signedIn()
+        && request.resource.data.uid == uid()
+        && existsAfter(docPath('admins', uid()));
+      allow update, delete: if false;
+    }
+
+    match /admins/{adminId} {
+      allow read: if signedIn() && (adminId == uid() || isAdmin());
+      allow create: if isAdmin()
+        // 최초 관리자: 아직 setup/admin 이 없고, 같은 일괄 쓰기에서 setup/admin 을 자기 uid 로 만든다
+        || (signedIn() && adminId == uid()
+            && !exists(docPath('setup', 'admin'))
+            && getAfter(docPath('setup', 'admin')).data.uid == uid());
+      allow update: if isAdmin();
+      allow delete: if isAdmin() && adminId != uid();
+    }
+
+    match /meta/{docId} {
+      allow read: if isAdmin() || isMember();
+      allow write: if isAdmin();
+    }
+
+    match /cohorts/{cohortId} {
+      allow read: if isAdmin() || isMember();
+      allow write: if isAdmin();
+    }
+
+    match /members/{memberId} {
+      allow read: if isAdmin() || (signedIn() && memberId == uid());
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin();
+    }
+
+    match /posts/{postId} {
+      function validPost(d) {
+        return isStr(d.url, 1000) && d.url.matches('^https?://.+')
+          && isStr(d.title, 120) && isStr(d.memo, 300)
+          && d.postDate is string && d.postDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+          && ((d.type == 'review' && d.status == 'pending') || (d.type == 'free' && d.status == 'free'));
+      }
+      allow read: if isAdmin() || (signedIn() && resource.data.uid == uid());
+      allow create: if isAdmin()
+        || (isMember()
+            && request.resource.data.uid == uid()
+            && request.resource.data.cohortId == myCohort()
+            && request.resource.data.keys().hasOnly(['uid', 'loginId', 'name', 'cohortId', 'url', 'title', 'postDate',
+                 'memo', 'type', 'status', 'createdAt', 'updatedAt'])
+            && validPost(request.resource.data));
+      allow update: if isAdmin()
+        || (signedIn() && resource.data.uid == uid()
+            && resource.data.status != 'approved'
+            && changedOnly(['url', 'title', 'postDate', 'memo', 'type', 'status', 'updatedAt'])
+            && validPost(request.resource.data));
+      allow delete: if isAdmin()
+        || (signedIn() && resource.data.uid == uid() && resource.data.status != 'approved');
+    }
+
+    match /comments/{commentId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.memberUid == uid());
+      allow create: if isAdmin() && isStr(request.resource.data.text, 500) && request.resource.data.text.size() > 0;
+      allow update: if (isAdmin() && isStr(request.resource.data.text, 500))
+        // 챌린지원은 "확인/반응"만 남길 수 있다 (반응 목록은 js/config.js 의 APP.reactions 와 맞춘다)
+        || (signedIn() && resource.data.memberUid == uid()
+            && changedOnly(['reaction', 'readAt'])
+            && request.resource.data.reaction in ['', 'like', 'heart', 'clap', 'thanks', 'fire']);
+      allow delete: if isAdmin();
+    }
+
+    // 블로그 일 방문자 수 — 문서 id 는 {uid}_{YYYY-MM-DD}
+    match /visits/{visitId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.uid == uid());
+      allow create, update: if isAdmin()
+        || (isMember()
+            && request.resource.data.uid == uid()
+            && visitId == uid() + '_' + request.resource.data.date
+            && request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+            && request.resource.data.count is int
+            && request.resource.data.count >= 0 && request.resource.data.count <= 9999999
+            && request.resource.data.cohortId is string);
+      allow delete: if isAdmin() || (signedIn() && resource.data.uid == uid());
+    }
+  }
+}
