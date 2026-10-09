@@ -250,3 +250,42 @@ export function seriesStats(series) {
     n: vals.length
   };
 }
+
+/* ── 네이버 블로그 ─────────────────────────────────────── */
+/**
+ * 블로그 주소에서 네이버 블로그 아이디를 뽑는다. 네이버 블로그가 아니면 ''.
+ *   https://blog.naver.com/myid            https://m.blog.naver.com/myid/223...
+ *   https://blog.naver.com/PostView.naver?blogId=myid&logNo=...      https://myid.blog.me
+ */
+export function naverBlogId(raw) {
+  const url = normalizeUrl(raw);
+  if (!url) return '';
+  const u = new URL(url);
+  const host = u.hostname.toLowerCase();
+  const valid = (id) => (/^[a-z0-9_-]{2,40}$/i.test(id || '') ? id.toLowerCase() : '');
+  const me = host.match(/^([a-z0-9_-]+)\.blog\.me$/i);
+  if (me) return valid(me[1]);
+  if (host !== 'blog.naver.com' && host !== 'm.blog.naver.com') return '';
+  const q = u.searchParams.get('blogId');
+  if (q) return valid(q);
+  const first = u.pathname.split('/').filter(Boolean)[0] || '';
+  if (/\.(naver|nhn)$/i.test(first)) return '';
+  return valid(first);
+}
+
+/**
+ * 네이버 방문자 위젯 응답(XML) → [{ date:'YYYY-MM-DD', count }]
+ *   <visitorcnts><visitorcnt id="20261008" cnt="123" />…</visitorcnts>
+ * 비공식 형식이라 속성 순서가 바뀌어도 읽히게 태그마다 따로 뽑는다.
+ */
+export function parseNaverVisitors(xml) {
+  const out = [];
+  for (const tag of String(xml || '').match(/<visitorcnt\b[^>]*>/gi) || []) {
+    const id = (tag.match(/\bid\s*=\s*["'](\d{8})["']/i) || [])[1];
+    const cnt = (tag.match(/\bcnt\s*=\s*["'](\d+)["']/i) || [])[1];
+    if (!id || cnt == null) continue;
+    const date = `${id.slice(0, 4)}-${id.slice(4, 6)}-${id.slice(6, 8)}`;
+    if (isISODate(date)) out.push({ date, count: Number(cnt) });
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}

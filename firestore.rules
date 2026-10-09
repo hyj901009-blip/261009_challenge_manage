@@ -38,7 +38,11 @@ service cloud.firestore {
     match /members/{memberId} {
       allow read: if isAdmin() || (signedIn() && memberId == uid());
       allow create, delete: if isAdmin();
-      allow update: if isAdmin();
+      allow update: if isAdmin()
+        // 챌린지원은 자기 블로그 주소만 바꿀 수 있다 (네이버 방문자 수 자동 가져오기용)
+        || (signedIn() && memberId == uid()
+            && changedOnly(['blogUrl'])
+            && isStr(request.resource.data.blogUrl, 300));
     }
 
     match /posts/{postId} {

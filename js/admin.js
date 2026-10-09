@@ -4,11 +4,11 @@ import {
   logout, authErrorMessage, getAppMeta, setActiveCohort, listCohorts, createCohort, updateCohort, wipeCohortData, deleteCohort,
   listMembers, createMember, updateMember, deleteMember, resetPasswordViaApi, isAdminApiEnabled,
   listPostsByCohort, setPostStatus, deletePost, listCommentsByCohort, addComment, editComment, deleteComment,
-  listVisitsByCohort
+  listVisitsByCohort, syncNaverVisitors
 } from './firebase.js';
 import {
   todayISO, addDays, computeProgress, shortDate, isISODate, normalizeGoals, normalizeUrl, normalizeLoginId,
-  validateLoginId, validatePassword, visitSeries, seriesStats
+  validateLoginId, validatePassword, visitSeries, seriesStats, naverBlogId
 } from './utils.js';
 import {
   $, $$, esc, toast, busy, requireRole, lineChart, statusBadge, fmtDateTime, tsMillis, reactionOf, POST_TYPE
@@ -343,15 +343,53 @@ function renderVisits() {
     return Object.assign({ p }, seriesStats(s));
   });
   $('#vTable').innerHTML = !rows.length ? '<div class="empty">참여자가 없습니다.</div>' : `
-    <table><thead><tr><th>이름</th><th class="num">최근</th><th class="num">직전 대비</th><th class="num">평균</th><th class="num">최고</th><th class="num">기록 일수</th><th></th></tr></thead>
+    <table><thead><tr><th>이름</th><th>블로그</th><th class="num">최근</th><th class="num">직전 대비</th><th class="num">평균</th><th class="num">최고</th><th class="num">기록 일수</th><th></th></tr></thead>
     <tbody>${rows.map((r) => `<tr><td>${esc(r.p.name)}${tag(r.p)}</td>
+      <td>${blogCell(r.p.member)}</td>
       <td class="num">${r.last == null ? '-' : r.last.toLocaleString()}</td><td class="num">${deltaHTML(r.delta)}</td>
       <td class="num">${r.avg == null ? '-' : r.avg.toLocaleString()}</td><td class="num">${r.max == null ? '-' : r.max.toLocaleString()}</td>
-      <td class="num">${r.n}</td><td><button class="btn sm" type="button" data-vsel="${esc(r.p.uid)}">그래프</button></td></tr>`).join('')}</tbody></table>`;
+      <td class="num">${r.n}</td><td><button class="btn sm" type="button" data-vsel="${esc(r.p.uid)}">그래프</button>
+        ${r.p.member && naverBlogId(r.p.member.blogUrl) ? `<button class="btn sm" type="button" data-vsync="${esc(r.p.uid)}" ${S.apiEnabled ? '' : 'disabled'}>🔄</button>` : ''}</td></tr>`).join('')}</tbody></table>`;
+  $('#vSyncAll').disabled = !S.apiEnabled;
+  const naverCount = rows.filter((r) => r.p.member && naverBlogId(r.p.member.blogUrl)).length;
+  $('#vSyncNote').hidden = false;
+  $('#vSyncNote').textContent = S.apiEnabled
+    ? `네이버 블로그로 등록된 챌린지원 ${naverCount}명 / ${rows.length}명`
+    : '네이버 자동 가져오기는 Vercel 환경변수 FIREBASE_SERVICE_ACCOUNT 를 등록해야 동작합니다.';
 }
 
+function blogCell(m) {
+  if (!m || !m.blogUrl) return '<span class="faint">-</span>';
+  const id = naverBlogId(m.blogUrl);
+  return `<a href="${esc(m.blogUrl)}" target="_blank" rel="noopener noreferrer">${id ? `<span class="badge ok">N</span> ${esc(id)}` : '열기'}</a>`;
+}
+
+function syncReport(r) {
+  if (!r.total) return '네이버 블로그 주소가 등록된 챌린지원이 없습니다.';
+  const fail = r.failed.length ? ` · 실패 ${r.failed.length}명: ${r.failed.map((f) => `${f.name}(${f.error})`).join(', ')}` : '';
+  return `네이버에서 ${r.ok}/${r.total}명 가져왔습니다${fail}`;
+}
+
+$('#vSyncAll').addEventListener('click', (ev) => busy(ev.currentTarget, async () => {
+  const r = await syncNaverVisitors({ cohortId: S.cohortId });
+  S.visits = await listVisitsByCohort(S.cohortId);
+  renderVisits();
+  $('#vSyncNote').textContent = syncReport(r);
+  toast(`${r.ok}/${r.total}명 가져옴`, r.failed.length ? 'bad' : 'ok');
+}, authErrorMessage));
+
 $('#vTarget').addEventListener('change', renderVisits);
-$('#vTable').addEventListener('click', (ev) => {
+$('#vTable').addEventListener('click', async (ev) => {
+  const sync = ev.target.closest('[data-vsync]');
+  if (sync) {
+    await busy(sync, async () => {
+      const r = await syncNaverVisitors({ uid: sync.dataset.vsync });
+      S.visits = await listVisitsByCohort(S.cohortId);
+      renderVisits();
+      toast(r.ok ? '네이버에서 가져왔습니다.' : syncReport(r), r.ok ? 'ok' : 'bad');
+    }, authErrorMessage);
+    return;
+  }
   const b = ev.target.closest('[data-vsel]');
   if (!b) return;
   $('#vTarget').value = b.dataset.vsel;
