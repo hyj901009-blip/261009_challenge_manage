@@ -306,3 +306,23 @@ input[type='text'], input[type='password'], input[type='url'], input[type='date'
   .hero-mascot { max-width: 300px; justify-self: center; }
   .hero-copy p { max-width: none; }
 }
+
+/* Let the illustration fill the desktop banner's entire right half. */
+@media (min-width: 701px) {
+  .challenge-hero {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0;
+    padding: 0;
+  }
+  .challenge-hero .hero-copy { padding: 36px 40px; }
+  .challenge-hero .hero-mascot {
+    position: absolute;
+    inset: 0 0 0 auto;
+    width: 50%;
+    height: 100%;
+    max-width: none;
+    border-radius: 0;
+    object-fit: cover;
+    object-position: center;
+  }
+}
