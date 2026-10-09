@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#102d84">
+  <title>블로그 챌린지 · 관리자</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛠</text></svg>">
+</head>
+<body>
+  <header class="top">
+    <div class="top-in">
+      <h1>🛠 <span class="app-title">블로그 챌린지</span><span class="tag">관리자</span></h1>
+      <select id="cohortSel" style="width:auto;padding:6px 10px" aria-label="볼 기수"></select>
+      <span class="spacer"></span>
+      <span class="who" id="who"></span>
+      <button class="btn sm" id="reloadBtn" type="button" title="새로고침">↻</button>
+      <button class="btn sm" id="logoutBtn" type="button">로그아웃</button>
+    </div>
+  </header>
+
+  <main class="wrap" id="main" hidden>
+    <div class="notice" id="noCohortNotice" hidden>아직 기수가 없습니다. <b>[기수 · 미션 설정]</b> 탭에서 첫 기수를 만들어 주세요.</div>
+
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="progress" aria-selected="true">📈 진척 현황</button>
+      <button role="tab" data-tab="posts">📝 포스팅 검토 <span class="dot-badge" id="pendingBadge" hidden></span></button>
+      <button role="tab" data-tab="visits">👀 방문자 추이</button>
+      <button role="tab" data-tab="members">👥 챌린지원 관리</button>
+      <button role="tab" data-tab="cohorts">⚙️ 기수 · 미션 설정</button>
+    </nav>
+
+    <!-- ── 진척 현황 ── -->
+    <section data-panel="progress">
+      <div class="card">
+        <h2>📈 미션 진척 <span class="right faint" id="periodText"></span></h2>
+        <div class="row" style="margin-bottom:12px">
+          <label class="field"><span>기준일</span><input type="date" id="refDate"></label>
+          <label class="field"><span>정렬</span>
+            <select id="sortSel">
+              <option value="name">이름순</option>
+              <option value="rate">달성률 높은순</option>
+              <option value="rateAsc">달성률 낮은순</option>
+              <option value="total">포스팅 많은순</option>
+            </select>
+          </label>
+        </div>
+        <div class="tiles" id="progTiles"></div>
+        <div class="table-wrap" id="progTable"></div>
+      </div>
+
+      <div class="card">
+        <h2>🗓 기간별 매트릭스
+          <span class="right">
+            <span class="seg" role="radiogroup" aria-label="보기 단위">
+              <label><input type="radio" name="mview" value="daily" checked>데일리</label>
+              <label><input type="radio" name="mview" value="weekly">위클리</label>
+              <label><input type="radio" name="mview" value="monthly">먼슬리</label>
+            </span>
+          </span>
+        </h2>
+        <div class="table-wrap" id="matrix"></div>
+        <div class="legend">
+          <span><i style="background:var(--ok)"></i>목표 달성</span>
+          <span><i style="background:var(--warn-soft);border:1px solid var(--warn)"></i>일부</span>
+          <span><i style="background:var(--bad-soft)"></i>미달</span>
+          <span><i style="background:var(--surface-2);border:1px solid var(--border)"></i>예정</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 포스팅 검토 ── -->
+    <section data-panel="posts" hidden>
+      <div class="card">
+        <h2>📝 챌린지원 제출 포스팅</h2>
+        <div class="row" style="margin-bottom:12px">
+          <span class="seg" role="radiogroup" aria-label="등록 방식">
+            <label><input type="radio" name="ptype" value="review" checked>검토 후 등록 <span id="cntReview"></span></label>
+            <label><input type="radio" name="ptype" value="free">자유 등록 <span id="cntFree"></span></label>
+            <label><input type="radio" name="ptype" value="all">전체</label>
+          </span>
+          <label class="field"><span>상태</span>
+            <select id="pStatus">
+              <option value="all">전체</option>
+              <option value="pending">검토 대기</option>
+              <option value="approved">검토 완료</option>
+              <option value="revise">수정 요청</option>
+            </select>
+          </label>
+          <label class="field"><span>챌린지원</span><select id="pMember"></select></label>
+          <label class="field grow"><span>검색</span><input type="text" id="pSearch" placeholder="제목·주소·메모·코멘트"></label>
+        </div>
+        <div id="postList"></div>
+      </div>
+    </section>
+
+    <!-- ── 방문자 추이 ── -->
+    <section data-panel="visits" hidden>
+      <div class="card">
+        <h2>👀 블로그 일 방문자 수 추이</h2>
+        <p class="faint" style="margin-top:-6px">챌린지원이 대시보드에 직접 입력한 일 방문자 수입니다.</p>
+        <div class="row" style="margin-bottom:12px">
+          <label class="field"><span>대상</span><select id="vTarget"></select></label>
+        </div>
+        <div class="tiles" id="vTiles"></div>
+        <div id="vChart"></div>
+      </div>
+      <div class="card">
+        <h2>👥 챌린지원별 요약</h2>
+        <div class="table-wrap" id="vTable"></div>
+      </div>
+    </section>
+
+    <!-- ── 챌린지원 관리 ── -->
+    <section data-panel="members" hidden>
+      <div class="grid2">
+        <div class="card">
+          <h2>➕ 챌린지원 계정 만들기</h2>
+          <form id="mForm">
+            <div class="row">
+              <label class="field grow"><span>아이디 (한글 가능)</span><input type="text" id="mId" placeholder="예) 홍길동" required></label>
+              <label class="field grow"><span>초기 비밀번호</span><input type="text" id="mPw" autocomplete="off" required></label>
+              <button class="btn sm" type="button" id="genPw" style="margin-bottom:4px">자동 생성</button>
+            </div>
+            <div class="row" style="margin-top:10px">
+              <label class="field grow"><span>이름 (표시용, 비우면 아이디)</span><input type="text" id="mName" maxlength="30"></label>
+              <label class="field grow"><span>기수</span><select id="mCohort"></select></label>
+            </div>
+            <label class="field" style="margin-top:10px"><span>블로그 주소 (선택)</span><input type="text" inputmode="url" id="mBlog" placeholder="https://blog.naver.com/아이디"></label>
+            <button class="btn primary block" id="mBtn" type="submit">계정 만들기</button>
+          </form>
+          <details class="fold" style="margin-top:14px">
+            <summary>여러 명 한 번에 만들기</summary>
+            <p class="faint">한 줄에 <code>아이디, 비밀번호, 이름</code> 순서로 적어 주세요. 비밀번호를 비우면 자동 생성, 이름을 비우면 아이디를 씁니다. 위에서 고른 기수로 등록됩니다.</p>
+            <textarea id="bulkText" rows="6" placeholder="홍길동, 1234abcd, 홍길동&#10;김철수,,&#10;이영희, qwer5678"></textarea>
+            <button class="btn" id="bulkBtn" type="button" style="margin-top:8px">일괄 생성</button>
+          </details>
+        </div>
+        <div class="card">
+          <h2>📋 전달용 안내문</h2>
+          <p class="faint" style="margin-top:-6px">방금 만든 계정의 로그인 정보입니다. 복사해서 챌린지원에게 전달하세요. (이 화면을 벗어나면 비밀번호는 다시 볼 수 없습니다)</p>
+          <textarea id="handout" rows="10" readonly placeholder="계정을 만들면 여기에 안내문이 쌓입니다."></textarea>
+          <div class="row" style="margin-top:8px">
+            <button class="btn" id="copyHandout" type="button">복사하기</button>
+            <button class="btn" id="clearHandout" type="button">비우기</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>👥 챌린지원 목록 <span class="right"><label class="faint"><input type="checkbox" id="mAll"> 모든 기수 보기</label></span></h2>
+        <p class="faint" id="apiNotice" hidden style="margin-top:-6px">ℹ️ 비밀번호 재설정과 로그인 계정 삭제는 Vercel 환경변수 <code>FIREBASE_SERVICE_ACCOUNT</code>를 등록하면 사용할 수 있습니다. (README 참고)</p>
+        <div class="table-wrap" id="mTable"></div>
+      </div>
+    </section>
+
+    <!-- ── 기수 · 미션 설정 ── -->
+    <section data-panel="cohorts" hidden>
+      <div class="grid2">
+        <div class="card" id="editCohortCard">
+          <h2>✏️ 미션 기간 · 목표 설정 <span class="right" id="activeMark"></span></h2>
+          <form id="cForm">
+            <label class="field"><span>기수 이름</span><input type="text" id="cName" maxlength="30" required></label>
+            <div class="row">
+              <label class="field grow"><span>시작일</span><input type="date" id="cStart" required></label>
+              <label class="field grow"><span>종료일</span><input type="date" id="cEnd" required></label>
+            </div>
+            <div class="row" style="margin-top:10px">
+              <label class="field grow"><span>데일리 목표 (개/일)</span><input type="number" id="cDaily" min="1" required></label>
+              <label class="field grow"><span>위클리 목표 (개/주)</span><input type="number" id="cWeekly" min="1" required></label>
+              <label class="field grow"><span>먼슬리 목표 (개/월)</span><input type="number" id="cMonthly" min="1" required></label>
+            </div>
+            <p class="faint">기간에 일부만 걸친 주·월은 걸친 날 수만큼 목표가 비례해서 줄어듭니다.</p>
+            <div class="row">
+              <button class="btn primary" id="cSave" type="submit">저장</button>
+              <button class="btn" id="cActivate" type="button">챌린지원에게 보이는 활성 기수로 지정</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card">
+          <h2>🔄 새 기수 시작 (기수별 리셋)</h2>
+          <p class="faint" style="margin-top:-6px">새 기수를 만들면 진척·포스팅이 <b>0부터 새로</b> 집계됩니다. 이전 기수 기록은 지워지지 않고 위의 기수 선택에서 언제든 다시 볼 수 있습니다.</p>
+          <form id="nForm">
+            <label class="field"><span>기수 이름</span><input type="text" id="nName" maxlength="30" placeholder="예) 2기" required></label>
+            <div class="row">
+              <label class="field grow"><span>시작일</span><input type="date" id="nStart" required></label>
+              <label class="field grow"><span>종료일</span><input type="date" id="nEnd" required></label>
+            </div>
+            <div class="row" style="margin-top:10px">
+              <label class="field grow"><span>데일리</span><input type="number" id="nDaily" min="1" required></label>
+              <label class="field grow"><span>위클리</span><input type="number" id="nWeekly" min="1" required></label>
+              <label class="field grow"><span>먼슬리</span><input type="number" id="nMonthly" min="1" required></label>
+            </div>
+            <label class="faint" style="display:block;margin-top:10px"><input type="checkbox" id="nActivate" checked> 만들자마자 활성 기수로 지정</label>
+            <label class="faint" style="display:block"><input type="checkbox" id="nMove"> 지금 보고 있는 기수의 챌린지원을 새 기수로 옮기기 (계정 유지)</label>
+            <button class="btn primary block" id="nBtn" type="submit" style="margin-top:10px">새 기수 만들기</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>🧨 기수 데이터 초기화</h2>
+        <p class="faint" style="margin-top:-6px">지금 보고 있는 기수의 <b>포스팅·코멘트·방문자 기록을 모두 삭제</b>합니다. 기수 설정과 챌린지원 계정은 남습니다. 되돌릴 수 없습니다.</p>
+        <div class="row">
+          <button class="btn danger" id="wipeBtn" type="button">이 기수 기록 초기화</button>
+          <button class="btn danger" id="delCohortBtn" type="button">이 기수 자체를 삭제</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>🔑 관리자 계정</h2>
+        <div id="adminList" class="faint"></div>
+        <form class="row" id="aForm" style="margin-top:10px">
+          <label class="field grow"><span>새 관리자 아이디</span><input type="text" id="aId" required></label>
+          <label class="field grow"><span>비밀번호 (6자 이상)</span><input type="text" id="aPw" autocomplete="off" required></label>
+          <button class="btn" id="aBtn" type="submit">관리자 추가</button>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="js/admin.js"></script>
+</body>
+</html>

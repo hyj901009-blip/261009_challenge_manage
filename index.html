@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#102d84">
+  <title>블로그 챌린지 · 로그인</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✍️</text></svg>">
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="card login-card">
+      <h1>✍️ <span id="appTitle">블로그 챌린지</span></h1>
+      <p class="faint" style="margin-top:0">관리자에게 받은 아이디와 비밀번호로 로그인하세요.</p>
+
+      <form id="loginForm" autocomplete="on">
+        <label class="field"><span>아이디</span>
+          <input type="text" id="loginId" name="username" autocomplete="username" placeholder="예) 홍길동" required>
+        </label>
+        <label class="field"><span>비밀번호</span>
+          <input type="password" id="loginPw" name="password" autocomplete="current-password" required>
+        </label>
+        <p class="err" id="loginErr"></p>
+        <button class="btn primary block" id="loginBtn" type="submit">로그인</button>
+      </form>
+
+      <!-- 아직 관리자가 한 명도 없을 때만 보인다 (최초 1회) -->
+      <section id="setupBox" hidden>
+        <hr class="hr">
+        <h2>🛠 최초 관리자 계정 만들기</h2>
+        <p class="faint">아직 관리자 계정이 없습니다. 처음 한 번만 만들 수 있고, 이후에는 이 화면이 사라집니다.</p>
+        <form id="setupForm">
+          <label class="field"><span>관리자 아이디 (한글 가능)</span>
+            <input type="text" id="setupId" autocomplete="off" required>
+          </label>
+          <label class="field"><span>비밀번호 (6자 이상)</span>
+            <input type="password" id="setupPw" autocomplete="new-password" required>
+          </label>
+          <label class="field"><span>비밀번호 확인</span>
+            <input type="password" id="setupPw2" autocomplete="new-password" required>
+          </label>
+          <p class="err" id="setupErr"></p>
+          <button class="btn block" id="setupBtn" type="submit">관리자 계정 만들기</button>
+        </form>
+      </section>
+    </div>
+  </div>
+  <script type="module" src="js/login.js"></script>
+</body>
+</html>

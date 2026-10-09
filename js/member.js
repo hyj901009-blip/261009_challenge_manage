@@ -1,0 +1,337 @@
+/* 챌린지원 대시보드 — 미션 진척 / 블로그 글 등록 / 받은 코멘트 + 반응 / 방문자 추이 */
+import { APP } from './config.js';
+import {
+  logout, getCohort, listMyPosts, addPost, editMyPost, deleteMyPost, listMyComments, reactToComment,
+  listMyVisits, saveVisit, deleteVisit, changeMyPassword, authErrorMessage
+} from './firebase.js';
+import {
+  todayISO, addDays, computeProgress, shortDate, normalizeUrl, isISODate, visitSeries, seriesStats, diffDays
+} from './utils.js';
+import {
+  $, $$, esc, toast, busy, requireRole, progressBlock, dayStrip, lineChart, statusBadge, fmtDateTime,
+  tsMillis, reactionOf, POST_TYPE
+} from './ui.js';
+
+const S = { user: null, me: null, cohort: null, posts: [], comments: [], visits: [], editingId: null };
+const today = () => todayISO(APP.timezone);
+
+$$('.app-title').forEach((el) => { el.textContent = APP.title; });
+$('#logoutBtn').addEventListener('click', async () => { await logout(); location.replace('index.html'); });
+
+/* ── 진척 ─────────────────────────────────────────────── */
+function myCohortPosts() {
+  return S.posts.filter((p) => p.cohortId === S.me.cohortId);
+}
+
+function renderProgress() {
+  const c = S.cohort;
+  if (!c) {
+    $('#progressCard').hidden = true;
+    return;
+  }
+  const t = today();
+  const pr = computeProgress(c, myCohortPosts(), t);
+  if (!pr.valid) {
+    $('#progressCard').innerHTML = '<h2>📈 미션 진척</h2><div class="empty">미션 기간이 아직 설정되지 않았습니다.</div>';
+    return;
+  }
+  const phaseText = pr.phase === 'before' ? `시작까지 D-${diffDays(t, c.startDate)}`
+    : pr.phase === 'after' ? '미션 종료' : `${pr.dayNumber}일차 / ${pr.totalDays}일`;
+  $('#periodText').textContent = `${shortDate(c.startDate)} ~ ${shortDate(c.endDate)} · ${phaseText}`;
+
+  $('#summaryTiles').innerHTML = `
+    <div class="tile"><div class="lbl">총 포스팅</div><div class="val">${pr.totalPosts}<small> 개</small></div></div>
+    <div class="tile"><div class="lbl">연속 달성</div><div class="val">🔥 ${pr.streak}<small> 일</small></div></div>
+    <div class="tile"><div class="lbl">데일리 달성률</div><div class="val">${pr.rate}<small>% (${pr.achievedDays}/${pr.elapsedDays}일)</small></div></div>`;
+
+  const refLabel = pr.phase === 'running' ? '오늘' : shortDate(pr.ref);
+  $('#progBlocks').innerHTML =
+    progressBlock(`데일리 · ${refLabel}`, pr.daily.count, pr.daily.goal, `하루 ${pr.goals.daily}개 목표`) +
+    progressBlock(`위클리 · ${pr.weekly.index}주차`, pr.weekly.count, pr.weekly.goal, `${shortDate(pr.weekly.from)} ~ ${shortDate(pr.weekly.to)}`) +
+    progressBlock(`먼슬리 · ${pr.monthly.label}`, pr.monthly.count, pr.monthly.goal, `${shortDate(pr.monthly.from)} ~ ${shortDate(pr.monthly.to)}`);
+
+  $('#strip').innerHTML = dayStrip(pr.days, t);
+  $('#weekTable').innerHTML = `<table><thead><tr><th>주차</th><th>기간</th><th class="num">달성</th></tr></thead><tbody>${
+    pr.weeks.map((w) => `<tr><td>${w.index}주차</td><td>${shortDate(w.from)}~${shortDate(w.to)}</td>
+      <td class="num">${w.count}/${w.goal} ${w.done ? '✅' : ''}</td></tr>`).join('')}</tbody></table>`;
+  $('#monthTable').innerHTML = `<table><thead><tr><th>월</th><th>기간</th><th class="num">달성</th></tr></thead><tbody>${
+    pr.months.map((m) => `<tr><td>${m.label}</td><td>${shortDate(m.from)}~${shortDate(m.to)}</td>
+      <td class="num">${m.count}/${m.goal} ${m.done ? '✅' : ''}</td></tr>`).join('')}</tbody></table>`;
+}
+
+/* ── 글 등록 ──────────────────────────────────────────── */
+function currentType() { return $('input[name="ptype"]:checked').value; }
+
+function paintTypeHelp() {
+  $('#typeHelp').textContent = currentType() === 'review'
+    ? '관리자가 글을 읽고 검토 결과와 코멘트를 남겨 줍니다.'
+    : '검토 없이 바로 미션으로 기록됩니다. (관리자가 코멘트를 남길 수도 있어요)';
+}
+$$('input[name="ptype"]').forEach((r) => r.addEventListener('change', paintTypeHelp));
+
+function resetForm() {
+  S.editingId = null;
+  $('#postForm').reset();
+  $('#pDate').value = defaultPostDate();
+  $('#postBtn').textContent = '등록하기';
+  $('#cancelEdit').hidden = true;
+  paintTypeHelp();
+}
+$('#cancelEdit').addEventListener('click', resetForm);
+
+function defaultPostDate() {
+  const t = today();
+  const c = S.cohort;
+  if (c && c.endDate && t > c.endDate) return c.endDate;
+  return t;
+}
+
+$('#postForm').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  if (!S.me.cohortId) { toast('참여 기수가 지정되지 않아 등록할 수 없습니다.', 'bad'); return; }
+  const url = normalizeUrl($('#pUrl').value);
+  if (!url) { toast('올바른 블로그 주소(http/https)를 입력해 주세요.', 'bad'); return; }
+  const postDate = $('#pDate').value;
+  if (!isISODate(postDate)) { toast('발행일을 선택해 주세요.', 'bad'); return; }
+  if (postDate > today()) { toast('미래 날짜로는 등록할 수 없습니다.', 'bad'); return; }
+  const c = S.cohort;
+  if (c && (postDate < c.startDate || postDate > c.endDate)) {
+    if (!confirm('미션 기간 밖의 날짜입니다. 등록은 되지만 진척에는 반영되지 않습니다. 계속할까요?')) return;
+  }
+  const data = {
+    url,
+    title: $('#pTitle').value.trim().slice(0, 120),
+    postDate,
+    memo: $('#pMemo').value.trim().slice(0, 300),
+    type: currentType()
+  };
+  await busy($('#postBtn'), async () => {
+    if (S.editingId) {
+      await editMyPost(S.editingId, data);
+      toast('수정했습니다.', 'ok');
+    } else {
+      await addPost(Object.assign(data, { uid: S.user.uid, loginId: S.me.loginId, name: S.me.name || S.me.loginId, cohortId: S.me.cohortId }));
+      toast(data.type === 'review' ? '검토 요청을 보냈습니다.' : '등록했습니다.', 'ok');
+    }
+    resetForm();
+    S.posts = await listMyPosts(S.user.uid);
+    renderAll();
+  }, authErrorMessage);
+});
+
+/* ── 코멘트 + 반응 ────────────────────────────────────── */
+function commentHTML(cm, { withPost } = {}) {
+  const unread = !cm.readAt;
+  const post = withPost ? S.posts.find((p) => p.id === cm.postId) : null;
+  const r = reactionOf(cm.reaction);
+  return `
+    <div class="comment ${unread ? 'unread' : ''}" data-cid="${esc(cm.id)}">
+      ${post ? `<div class="faint">📄 ${esc(post.title || post.url)} · ${shortDate(post.postDate)}</div>` : ''}
+      <div class="comment-text">${esc(cm.text)}</div>
+      <div class="comment-meta">
+        <span>관리자 · ${esc(fmtDateTime(cm.createdAt))}</span>
+        ${unread ? '<span class="badge new">NEW</span>' : `<span class="badge ok">확인함 ${r ? r.emoji : ''}</span>`}
+      </div>
+      <div class="reactions">
+        ${APP.reactions.map((x) => `<button type="button" class="react-btn" data-react="${x.key}" aria-pressed="${cm.reaction === x.key}" title="${esc(x.label)}">${x.emoji}</button>`).join('')}
+        ${unread ? '<button type="button" class="react-btn" data-react="">✔ 확인</button>' : ''}
+      </div>
+    </div>`;
+}
+
+function sortedComments() {
+  return S.comments.slice().sort((a, b) => tsMillis(b.createdAt) - tsMillis(a.createdAt));
+}
+
+function renderCommentFeed() {
+  const unread = S.comments.filter((c) => !c.readAt).length;
+  $('#unreadBadge').hidden = !unread;
+  $('#unreadBadge').textContent = `새 코멘트 ${unread}`;
+  let list = sortedComments();
+  if ($('#onlyUnread').checked) list = list.filter((c) => !c.readAt);
+  $('#commentFeed').innerHTML = list.length
+    ? list.map((c) => commentHTML(c, { withPost: true })).join('')
+    : `<div class="empty">${$('#onlyUnread').checked ? '안 읽은 코멘트가 없습니다. 🎉' : '아직 받은 코멘트가 없습니다.'}</div>`;
+}
+$('#onlyUnread').addEventListener('change', renderCommentFeed);
+
+document.addEventListener('click', async (ev) => {
+  const btn = ev.target.closest('.react-btn');
+  if (!btn) return;
+  const box = btn.closest('[data-cid]');
+  const cm = S.comments.find((c) => c.id === box.dataset.cid);
+  if (!cm) return;
+  // 같은 반응을 다시 누르면 반응만 취소(확인 상태는 유지)
+  const next = btn.dataset.react && cm.reaction === btn.dataset.react ? '' : btn.dataset.react;
+  await busy(btn, async () => {
+    await reactToComment(cm.id, next);
+    cm.reaction = next;
+    cm.readAt = cm.readAt || new Date();
+    renderCommentFeed();
+    renderPosts();
+    const r = reactionOf(next);
+    toast(r ? `${r.emoji} ${r.label}를 남겼어요` : '확인했어요', 'ok');
+  }, authErrorMessage);
+});
+
+/* ── 내 포스팅 ────────────────────────────────────────── */
+function renderPosts() {
+  const f = $('#postFilter').value;
+  const list = S.posts
+    .filter((p) => f === 'all' || p.type === f)
+    .sort((a, b) => (b.postDate || '').localeCompare(a.postDate || '') || tsMillis(b.createdAt) - tsMillis(a.createdAt));
+  if (!list.length) { $('#postList').innerHTML = '<div class="empty">아직 등록한 글이 없습니다.</div>'; return; }
+  $('#postList').innerHTML = list.map((p) => {
+    const cms = S.comments.filter((c) => c.postId === p.id).sort((a, b) => tsMillis(a.createdAt) - tsMillis(b.createdAt));
+    const unread = cms.some((c) => !c.readAt);
+    const other = p.cohortId !== S.me.cohortId ? '<span class="badge">지난 기수</span>' : '';
+    const editable = p.status !== 'approved' && p.cohortId === S.me.cohortId;
+    return `
+      <article class="post ${unread ? 'unread' : ''}">
+        <div class="post-head">
+          <span class="badge">${esc(POST_TYPE[p.type] || p.type)}</span>${statusBadge(p)}${other}
+          <span class="post-meta">${shortDate(p.postDate)} 발행</span>
+        </div>
+        <div class="post-title" style="margin-top:4px">${esc(p.title || '(제목 없음)')}</div>
+        <a class="post-url" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${esc(p.url)}</a>
+        ${p.memo ? `<p class="post-memo">${esc(p.memo)}</p>` : ''}
+        ${editable ? `<div class="post-actions">
+          <button class="btn sm" data-edit="${esc(p.id)}" type="button">수정</button>
+          <button class="btn sm danger" data-del="${esc(p.id)}" type="button">삭제</button></div>` : ''}
+        ${cms.length ? `<div class="comments">${cms.map((c) => commentHTML(c)).join('')}</div>` : ''}
+      </article>`;
+  }).join('');
+}
+$('#postFilter').addEventListener('change', renderPosts);
+
+$('#postList').addEventListener('click', async (ev) => {
+  const ed = ev.target.closest('[data-edit]');
+  const del = ev.target.closest('[data-del]');
+  if (ed) {
+    const p = S.posts.find((x) => x.id === ed.dataset.edit);
+    S.editingId = p.id;
+    $('#pUrl').value = p.url;
+    $('#pTitle').value = p.title || '';
+    $('#pDate').value = p.postDate;
+    $('#pMemo').value = p.memo || '';
+    $(`input[name="ptype"][value="${p.type}"]`).checked = true;
+    paintTypeHelp();
+    $('#postBtn').textContent = '수정 저장';
+    $('#cancelEdit').hidden = false;
+    $('#postForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } else if (del) {
+    const id = del.dataset.del;
+    if (S.comments.some((c) => c.postId === id)) { toast('코멘트가 달린 글은 관리자에게 삭제를 요청해 주세요.', 'bad'); return; }
+    if (!confirm('이 글을 삭제할까요? 미션 기록에서도 빠집니다.')) return;
+    await busy(del, async () => {
+      await deleteMyPost(id);
+      S.posts = S.posts.filter((p) => p.id !== id);
+      renderAll();
+      toast('삭제했습니다.');
+    }, authErrorMessage);
+  }
+});
+
+/* ── 방문자 수 ─────────────────────────────────────────── */
+function visitRange() {
+  const c = S.cohort;
+  const t = today();
+  if (c && isISODate(c.startDate) && isISODate(c.endDate)) {
+    return { from: c.startDate, to: t < c.endDate ? (t < c.startDate ? c.startDate : t) : c.endDate };
+  }
+  return { from: addDays(t, -29), to: t };
+}
+
+function renderVisits() {
+  const { from, to } = visitRange();
+  const series = visitSeries(S.visits, from, to);
+  const st = seriesStats(series);
+  const delta = st.delta == null ? '-' : `<span class="delta ${st.delta >= 0 ? 'up' : 'down'}">${st.delta >= 0 ? '▲' : '▼'} ${Math.abs(st.delta).toLocaleString()}</span>`;
+  $('#visitTiles').innerHTML = `
+    <div class="tile"><div class="lbl">최근 기록</div><div class="val">${st.last == null ? '-' : st.last.toLocaleString()}<small> 명</small></div></div>
+    <div class="tile"><div class="lbl">직전 대비</div><div class="val">${delta}</div></div>
+    <div class="tile"><div class="lbl">평균</div><div class="val">${st.avg == null ? '-' : st.avg.toLocaleString()}<small> 명</small></div></div>
+    <div class="tile"><div class="lbl">최고</div><div class="val">${st.max == null ? '-' : st.max.toLocaleString()}<small> 명</small></div></div>`;
+  $('#visitChart').innerHTML = lineChart(series, { label: '방문자' });
+}
+
+function fillVisitInput() {
+  const v = S.visits.find((x) => x.date === $('#vDate').value);
+  $('#vCount').value = v ? v.count : '';
+}
+$('#vDate').addEventListener('change', fillVisitInput);
+
+$('#visitForm').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const date = $('#vDate').value;
+  if (!isISODate(date) || date > today()) { toast('오늘 이전 날짜를 선택해 주세요.', 'bad'); return; }
+  await busy($('#visitBtn'), async () => {
+    await saveVisit(S.user.uid, S.me.cohortId || '', date, $('#vCount').value);
+    S.visits = await listMyVisits(S.user.uid);
+    renderVisits();
+    toast('저장했습니다.', 'ok');
+  }, authErrorMessage);
+});
+
+$('#visitDel').addEventListener('click', async (ev) => {
+  const date = $('#vDate').value;
+  if (!S.visits.some((v) => v.date === date)) { toast('이 날짜에는 기록이 없습니다.'); return; }
+  if (!confirm(`${shortDate(date)} 방문자 기록을 삭제할까요?`)) return;
+  await busy(ev.currentTarget, async () => {
+    await deleteVisit(S.user.uid, date);
+    S.visits = S.visits.filter((v) => v.date !== date);
+    fillVisitInput();
+    renderVisits();
+    toast('삭제했습니다.');
+  }, authErrorMessage);
+});
+
+/* ── 비밀번호 ─────────────────────────────────────────── */
+$('#pwForm').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  if ($('#pwNew').value !== $('#pwNew2').value) { toast('새 비밀번호 확인이 일치하지 않습니다.', 'bad'); return; }
+  await busy($('#pwBtn'), async () => {
+    await changeMyPassword($('#pwCur').value, $('#pwNew').value);
+    $('#pwForm').reset();
+    toast('비밀번호를 변경했습니다.', 'ok');
+  }, authErrorMessage);
+});
+
+/* ── 시작 ─────────────────────────────────────────────── */
+function renderAll() {
+  renderProgress();
+  renderCommentFeed();
+  renderPosts();
+  renderVisits();
+}
+
+async function boot() {
+  const { user, profile } = await requireRole('member');
+  S.user = user;
+  S.me = profile;
+  $('#who').textContent = `${profile.name || profile.loginId} 님`;
+  const [cohort, posts, comments, visits] = await Promise.all([
+    getCohort(profile.cohortId),
+    listMyPosts(user.uid),
+    listMyComments(user.uid),
+    listMyVisits(user.uid)
+  ]);
+  S.cohort = cohort;
+  S.posts = posts;
+  S.comments = comments;
+  S.visits = visits;
+  if (cohort) { $('#cohortTag').hidden = false; $('#cohortTag').textContent = cohort.name; }
+  $('#noCohort').hidden = !!cohort;
+  $('#pDate').value = defaultPostDate();
+  $('#pDate').max = today();
+  $('#vDate').value = addDays(today(), -1);
+  $('#vDate').max = today();
+  fillVisitInput();
+  paintTypeHelp();
+  renderAll();
+  $('#main').hidden = false;
+}
+
+boot().catch((e) => {
+  if (!/로그인 필요|권한 없음/.test(e.message)) { console.error(e); toast(authErrorMessage(e), 'bad'); $('#main').hidden = false; }
+});
