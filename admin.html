@@ -101,23 +101,30 @@
     <section data-panel="visits" hidden>
       <div class="card">
         <h2>👀 블로그 일 방문자 수 추이 <span class="right faint" id="vPeriod"></span></h2>
-        <p class="faint" style="margin-top:-6px">챌린지원마다 챌린지 기간 전체 그래프를 한 화면에 보여 줍니다. 점에 마우스를 올리면 그날의 방문자 수가 나옵니다.
-          네이버 블로그는 매일 00:10에 자동으로 가져오고, 그 밖의 블로그는 챌린지원이 직접 입력한 값입니다.</p>
-        <div class="row" style="margin-bottom:8px">
-          <label class="field"><span>정렬</span>
-            <select id="vSort">
-              <option value="name">이름순</option>
-              <option value="last">현재 방문자 많은순</option>
-              <option value="avg">평균 많은순</option>
-              <option value="max">최고 많은순</option>
-            </select>
-          </label>
-          <label class="faint" style="align-self:center"><input type="checkbox" id="vSameScale"> 모두 같은 세로 눈금으로 비교</label>
+        <p class="faint" style="margin-top:-6px">챌린지원 전체의 일 방문자 수를 한 그래프에 사람마다 다른 색 선으로 보여 줍니다. 그래프 위에 마우스를 올리면 그날 모두의 숫자가 나오고,
+          아래 이름을 누르면 그 사람 선을 숨기거나 다시 보일 수 있습니다. 네이버 블로그는 매일 00:10에 자동으로 가져옵니다.</p>
+        <div class="row" style="margin-bottom:6px">
+          <button class="btn sm" id="vShowAll" type="button">모두 보기</button>
+          <button class="btn sm" id="vHideAll" type="button">모두 숨기기</button>
           <span class="grow"></span>
           <button class="btn primary" id="vSyncAll" type="button">🔄 이 기수 전체 네이버에서 가져오기</button>
         </div>
+        <div class="mlegend" id="vLegend"></div>
+        <div id="vChart"></div>
         <p class="faint" id="vSyncNote" hidden></p>
-        <div class="vgrid" id="vGrid"></div>
+      </div>
+      <div class="card">
+        <h2>👥 챌린지원별 요약
+          <span class="right">
+            <select id="vSort" style="width:auto;padding:5px 10px" aria-label="정렬">
+              <option value="name">이름순</option>
+              <option value="last">현재 많은순</option>
+              <option value="avg">평균 많은순</option>
+              <option value="max">최고 많은순</option>
+            </select>
+          </span>
+        </h2>
+        <div class="table-wrap" id="vTable"></div>
       </div>
     </section>
 

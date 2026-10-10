@@ -11,8 +11,8 @@ import {
   validateLoginId, validatePassword, visitSeries, seriesStats, naverBlogId, rankRows
 } from './utils.js';
 import {
-  $, $$, esc, toast, busy, requireRole, lineChart, statusBadge, fmtDateTime, tsMillis, reactionOf, POST_TYPE,
-  installTooltips
+  $, $$, esc, toast, busy, requireRole, statusBadge, fmtDateTime, tsMillis, reactionOf, POST_TYPE,
+  installTooltips, renderMultiLineChart, seriesStyle
 } from './ui.js';
 
 const S = {
@@ -320,40 +320,35 @@ function visitRange() {
   return { from: c.startDate, to: c.endDate }; // 챌린지 기간 전체 — 아직 오지 않은 날은 빈칸
 }
 
+const vHidden = new Set(); // 그래프에서 숨긴 챌린지원 uid
+
 function renderVisits() {
   const { from, to } = visitRange();
   const c = cohort();
   $('#vPeriod').textContent = c ? `${c.name} · ${shortDate(from)} ~ ${shortDate(to)}` : '';
-  // 챌린지원마다 기간 전체 시계열과 요약값
-  const rows = participants().map((p) => {
+  // 색은 이름순 자리로 고정 — 정렬·숨기기를 바꿔도 같은 사람은 같은 색
+  const rows = participants().map((p, i) => {
     const series = visitSeries(S.visits.filter((v) => v.uid === p.uid), from, to);
-    return Object.assign({ p, series }, seriesStats(series));
+    return Object.assign({ p, series, colorIndex: i }, seriesStats(series));
   });
+  for (const k of [...vHidden]) if (!rows.some((r) => r.p.uid === k)) vHidden.delete(k);
+  const swatch = (i) => { const st = seriesStyle(i); return `<i class="swatch${st.dashed ? ' dashed' : ''}" style="--sw:${st.color};background:${st.color}"></i>`; };
+
+  $('#vLegend').innerHTML = rows.map((r) => `<button type="button" data-vkey="${esc(r.p.uid)}" aria-pressed="${!vHidden.has(r.p.uid)}">${swatch(r.colorIndex)}${esc(r.p.name)}</button>`).join('');
+  renderMultiLineChart($('#vChart'), rows.map((r) => ({ key: r.p.uid, name: r.p.name, colorIndex: r.colorIndex, points: r.series })),
+    { today: today(), hidden: vHidden, label: '챌린지원 일 방문자' });
+
   const sort = $('#vSort').value;
   const num = (v) => (v == null ? -1 : v);
-  rows.sort((a, b) => (sort === 'name' ? 0 : num(b[sort]) - num(a[sort])) || a.p.name.localeCompare(b.p.name, 'ko'));
-  // "같은 세로 눈금" 이면 모든 그래프의 최댓값을 가장 큰 사람에게 맞춘다
-  const sameMax = $('#vSameScale').checked ? Math.max(0, ...rows.map((r) => r.max || 0)) : 0;
+  const sorted = rows.slice().sort((a, b) => (sort === 'name' ? 0 : num(b[sort]) - num(a[sort])) || a.p.name.localeCompare(b.p.name, 'ko'));
   const fmt = (v) => (v == null ? '-' : v.toLocaleString());
-
-  $('#vGrid').innerHTML = !rows.length ? '<div class="empty">참여자가 없습니다.</div>' : rows.map((r) => {
-    const naver = r.p.member && naverBlogId(r.p.member.blogUrl);
-    return `
-    <article class="vcard" data-uid="${esc(r.p.uid)}">
-      <div class="vcard-head">
-        <span class="name">${esc(r.p.name)}</span>${tag(r.p)}
-        <span class="grow"></span>
-        ${blogCell(r.p.member)}
-        ${naver ? `<button class="btn sm" type="button" data-vsync="${esc(r.p.uid)}" title="네이버에서 가져오기" ${S.apiEnabled ? '' : 'disabled'}>🔄</button>` : ''}
-      </div>
-      <div class="vcard-stats">
-        <span>현재 <b>${fmt(r.last)}</b>명${r.lastDate ? ` <span class="faint">(${shortDate(r.lastDate)})</span>` : ''}</span>
-        <span>평균 <b>${fmt(r.avg)}</b></span>
-        <span>최고 <b>${fmt(r.max)}</b></span>
-      </div>
-      ${lineChart(r.series, { label: `${r.p.name} 방문자`, today: today(), compact: true, maxValue: sameMax })}
-    </article>`;
-  }).join('');
+  $('#vTable').innerHTML = !rows.length ? '<div class="empty">참여자가 없습니다.</div>' : `
+    <table><thead><tr><th>이름</th><th>블로그</th><th class="num">현재</th><th class="num">평균</th><th class="num">최고</th><th class="num">기록 일수</th><th></th></tr></thead>
+    <tbody>${sorted.map((r) => `<tr><td>${swatch(r.colorIndex)} ${esc(r.p.name)}${tag(r.p)}</td>
+      <td>${blogCell(r.p.member)}</td>
+      <td class="num">${fmt(r.last)}${r.lastDate ? ` <span class="faint">(${shortDate(r.lastDate)})</span>` : ''}</td>
+      <td class="num">${fmt(r.avg)}</td><td class="num">${fmt(r.max)}</td><td class="num">${r.n}</td>
+      <td>${r.p.member && naverBlogId(r.p.member.blogUrl) ? `<button class="btn sm" type="button" data-vsync="${esc(r.p.uid)}" title="네이버에서 가져오기" ${S.apiEnabled ? '' : 'disabled'}>🔄</button>` : ''}</td></tr>`).join('')}</tbody></table>`;
 
   $('#vSyncAll').disabled = !S.apiEnabled;
   const naverCount = rows.filter((r) => r.p.member && naverBlogId(r.p.member.blogUrl)).length;
@@ -384,8 +379,24 @@ $('#vSyncAll').addEventListener('click', (ev) => busy(ev.currentTarget, async ()
 }, authErrorMessage));
 
 $('#vSort').addEventListener('change', renderVisits);
-$('#vSameScale').addEventListener('change', renderVisits);
-$('#vGrid').addEventListener('click', async (ev) => {
+// 범례: 누르면 그 사람 선 숨기기/보이기, 마우스를 올리면 그 선만 강조
+$('#vLegend').addEventListener('click', (ev) => {
+  const b = ev.target.closest('[data-vkey]');
+  if (!b) return;
+  if (vHidden.has(b.dataset.vkey)) vHidden.delete(b.dataset.vkey); else vHidden.add(b.dataset.vkey);
+  renderVisits();
+});
+$('#vLegend').addEventListener('pointerover', (ev) => {
+  const b = ev.target.closest('[data-vkey]');
+  const svg = $('#vChart svg');
+  if (!b || !svg) return;
+  svg.classList.add('focus');
+  svg.querySelectorAll('.mline').forEach((g) => g.classList.toggle('hl', g.dataset.key === b.dataset.vkey));
+});
+$('#vLegend').addEventListener('pointerleave', () => { const svg = $('#vChart svg'); if (svg) svg.classList.remove('focus'); });
+$('#vShowAll').addEventListener('click', () => { vHidden.clear(); renderVisits(); });
+$('#vHideAll').addEventListener('click', () => { participants().forEach((p) => vHidden.add(p.uid)); renderVisits(); });
+$('#vTable').addEventListener('click', async (ev) => {
   const sync = ev.target.closest('[data-vsync]');
   if (!sync) return;
   await busy(sync, async () => {
