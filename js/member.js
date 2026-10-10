@@ -40,11 +40,6 @@ function renderProgress() {
     : pr.phase === 'after' ? '미션 종료' : `${pr.dayNumber}일차 / ${pr.totalDays}일`;
   $('#periodText').textContent = `${shortDate(c.startDate)} ~ ${shortDate(c.endDate)} · ${phaseText}`;
 
-  $('#summaryTiles').innerHTML = `
-    <div class="tile"><div class="lbl">총 포스팅</div><div class="val">${pr.totalPosts}<small> 개</small></div></div>
-    <div class="tile"><div class="lbl">오늘 포스팅</div><div class="val">${pr.phase === 'running' ? (pr.today.done ? `✅<small> ${pr.today.count}개</small>` : '<small>아직이에요</small>') : '-'}</div></div>
-    <div class="tile"><div class="lbl">연속 포스팅</div><div class="val">🔥 ${pr.streak}<small> 일</small></div></div>`;
-
   $('#progBlocks').innerHTML =
     progressBlock(`위클리 · ${pr.weekly.index}주차`, pr.weekly.count, pr.weekly.goal, `${shortDate(pr.weekly.from)} ~ ${shortDate(pr.weekly.to)} · 주 ${pr.goals.weekly}개 목표`) +
     progressBlock('챌린지 목표', pr.challenge.count, pr.challenge.goal, `${shortDate(pr.challenge.from)} ~ ${shortDate(pr.challenge.to)} · 전체 기간`);
