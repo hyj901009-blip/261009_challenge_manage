@@ -87,7 +87,6 @@ function renderProgress() {
   const unread = S.comments.filter((c2) => !c2.readAt).length;
   $('#progTiles').innerHTML = `
     <div class="tile"><div class="lbl">참여 인원</div><div class="val">${n}<small> 명</small></div></div>
-    <div class="tile"><div class="lbl">포스팅한 사람 (${esc(shortDate(valid[0] ? valid[0].pr.ref : ref))})</div><div class="val">${cnt((r) => r.pr.today.done)}<small> / ${n}</small></div></div>
     <div class="tile"><div class="lbl">이번 주 위클리 달성</div><div class="val">${cnt((r) => r.pr.weekly.done)}<small> / ${n}</small></div></div>
     <div class="tile"><div class="lbl">챌린지 목표 달성</div><div class="val">${cnt((r) => r.pr.challenge.done)}<small> / ${n}</small></div></div>
     <div class="tile"><div class="lbl">평균 챌린지 목표 진행률</div><div class="val">${avgGoal}<small>%</small></div></div>
@@ -103,7 +102,7 @@ function renderProgress() {
     return a.name.localeCompare(b.name, 'ko');
   });
   $('#progTable').innerHTML = !sorted.length ? '<div class="empty">아직 이 기수에 챌린지원이 없습니다.</div>' : `
-    <table><thead><tr><th class="num">순위</th><th>이름</th><th>오늘</th><th>위클리</th><th>챌린지 목표</th><th class="num">총 포스팅</th><th class="num">연속</th><th class="num">진행률</th><th>검토</th></tr></thead>
+    <table><thead><tr><th class="num">순위</th><th>이름</th><th>위클리</th><th>챌린지 목표</th><th class="num">진행률</th><th>검토</th></tr></thead>
     <tbody>${sorted.map((r) => {
       const pr = r.pr;
       const mine = S.posts.filter((p) => p.uid === r.uid);
@@ -111,11 +110,8 @@ function renderProgress() {
       return `<tr>
         <td class="num"><b>${rankOf.get(r.uid)}</b></td>
         <td><b>${esc(r.name)}</b> <span class="faint">${esc(r.loginId)}</span>${tag(r)}</td>
-        <td>${pr.today.done ? `✅ ${pr.today.count}` : '-'}</td>
         <td>${pr.weekly.count}/${pr.weekly.goal}${miniBar(pr.weekly.count, pr.weekly.goal)}</td>
         <td>${pr.challenge.count}/${pr.challenge.goal}${miniBar(pr.challenge.count, pr.challenge.goal)}</td>
-        <td class="num">${pr.totalPosts}</td>
-        <td class="num">🔥${pr.streak}</td>
         <td class="num">${pr.goalRate}%</td>
         <td>${pend ? `<span class="badge warn">대기 ${pend}</span>` : ''}</td></tr>`;
     }).join('')}</tbody></table>`;
