@@ -111,16 +111,18 @@ export function dayStrip(days, today) {
  * 아직 오지 않은 날은 빈칸으로 두고, 기록이 생기는 대로 하루하루 채워진다.
  * 점에 마우스를 올리면(모바일은 탭) 그날의 일 방문자 수가 말풍선으로 보인다.
  * 외부 라이브러리 없이 그려서 CDN 의존과 번들 크기를 줄인다.
+ * compact: 여러 명을 한 화면에 늘어놓는 작은 카드용 (가로 스크롤 없이 카드 폭에 맞춤)
+ * maxValue: 세로 눈금 최댓값을 직접 정할 때 (여러 그래프를 같은 눈금으로 비교)
  */
-export function lineChart(series, { height = 240, label = '방문자', today = '' } = {}) {
+export function lineChart(series, { height, label = '방문자', today = '', compact = false, maxValue = 0 } = {}) {
   const pts = series.map((p, i) => ({ i, date: p.date, v: p.value }));
   if (!pts.length) return '<div class="empty">표시할 기간이 없습니다.</div>';
   const vals = pts.filter((p) => p.v != null);
 
-  const W = Math.max(720, pts.length * 26);
-  const H = height;
-  const pad = { l: 48, r: 16, t: 18, b: 36 };
-  const maxV = vals.length ? Math.max(...vals.map((p) => p.v)) : 0;
+  const W = compact ? 420 : Math.max(720, pts.length * 26);
+  const H = height || (compact ? 190 : 240);
+  const pad = compact ? { l: 40, r: 12, t: 18, b: 28 } : { l: 48, r: 16, t: 18, b: 36 };
+  const maxV = Math.max(maxValue || 0, vals.length ? Math.max(...vals.map((p) => p.v)) : 0);
   const mag = maxV > 0 ? Math.pow(10, Math.floor(Math.log10(maxV))) : 1;
   const niceMax = maxV <= 5 ? 5 : Math.ceil(maxV / mag) * mag;
   const x = (i) => pad.l + (pts.length === 1 ? (W - pad.l - pad.r) / 2 : (i * (W - pad.l - pad.r)) / (pts.length - 1));
@@ -139,11 +141,11 @@ export function lineChart(series, { height = 240, label = '방문자', today = '
     return `<line x1="${pad.l}" x2="${W - pad.r}" y1="${y(v)}" y2="${y(v)}" class="grid"/>
       <text x="${pad.l - 8}" y="${y(v) + 4}" class="axis" text-anchor="end">${v.toLocaleString()}</text>`;
   }).join('');
-  const step = Math.ceil(pts.length / 14);
+  const step = Math.ceil(pts.length / (compact ? 5 : 14));
   const last = pts.length - 1;
   // 마지막 날짜 라벨과 겹치지 않게, 마지막 바로 앞의 규칙적인 라벨은 너무 가까우면 뺀다
   const xl = pts.filter((p) => p.i === last || (p.i % step === 0 && last - p.i >= Math.max(2, step * 0.6)))
-    .map((p) => `<text x="${x(p.i)}" y="${H - 12}" class="axis ${p.date === today ? 'axis-today' : ''}" text-anchor="middle">${p.date.slice(5).replace('-', '/')}</text>`).join('');
+    .map((p) => `<text x="${x(p.i)}" y="${H - (compact ? 8 : 12)}" class="axis ${p.date === today ? 'axis-today' : ''}" text-anchor="${compact && p.i === last ? 'end' : compact && p.i === 0 ? 'start' : 'middle'}">${p.date.slice(5).replace('-', '/')}</text>`).join('');
   const todayIdx = pts.findIndex((p) => p.date === today);
   const todayLine = todayIdx >= 0
     ? `<line class="today-line" x1="${x(todayIdx)}" x2="${x(todayIdx)}" y1="${pad.t}" y2="${H - pad.b}"/>
@@ -155,12 +157,13 @@ export function lineChart(series, { height = 240, label = '방문자', today = '
   const lines = segs.map((sg) => `<polyline class="line" points="${sg.map((p) => `${x(p.i)},${y(p.v)}`).join(' ')}"/>`).join('');
   const dots = vals.map((p) => {
     const tip = `${shortDate(p.date)} · ${p.v.toLocaleString()}명`;
-    return `<g class="pt" data-tip="${esc(tip)}"><circle class="hit" cx="${x(p.i)}" cy="${y(p.v)}" r="12"/>
-      <circle class="dot" cx="${x(p.i)}" cy="${y(p.v)}" r="4"/></g>`;
+    return `<g class="pt" data-tip="${esc(tip)}"><circle class="hit" cx="${x(p.i)}" cy="${y(p.v)}" r="${compact ? 9 : 12}"/>
+      <circle class="dot" cx="${x(p.i)}" cy="${y(p.v)}" r="${compact ? 3 : 4}"/></g>`;
   }).join('');
-  const emptyMsg = vals.length ? '' : `<text class="axis" x="${W / 2}" y="${(H - pad.b) / 2 + pad.t / 2}" text-anchor="middle">아직 기록이 없습니다. 하루하루 채워집니다.</text>`;
+  const emptyMsg = vals.length ? '' : `<text class="axis" x="${W / 2}" y="${(H - pad.b) / 2 + pad.t / 2}" text-anchor="middle">${compact ? '아직 기록이 없습니다' : '아직 기록이 없습니다. 하루하루 채워집니다.'}</text>`;
 
-  return `<div class="chart-scroll"><svg class="chart" viewBox="0 0 ${W} ${H}" style="min-width:${Math.round(W * 0.85)}px" role="img" aria-label="${esc(label)} 추이">
+  const size = compact ? '' : ` style="min-width:${Math.round(W * 0.85)}px"`;
+  return `<div class="chart-scroll"><svg class="chart${compact ? ' compact' : ''}" viewBox="0 0 ${W} ${H}"${size} role="img" aria-label="${esc(label)} 추이">
     ${future}${grid}${todayLine}${xl}${lines}${dots}${emptyMsg}</svg></div>`;
 }
 

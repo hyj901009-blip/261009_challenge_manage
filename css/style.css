@@ -188,6 +188,18 @@ table.matrix th.today { color: var(--info); }
 .chart-tip { position: fixed; z-index: 120; transform: translate(-50%, -100%); background: #0d1b40; color: #fff; font-size: 13px; font-weight: 600;
   padding: 6px 10px; border-radius: 8px; pointer-events: none; white-space: nowrap; box-shadow: 0 4px 14px rgba(0,0,0,.2); }
 .chart-tip::after { content: ''; position: absolute; left: 50%; bottom: -5px; transform: translateX(-50%); border: 5px solid transparent; border-bottom: 0; border-top-color: #0d1b40; }
+/* ── 관리자: 챌린지원별 방문자 그래프 격자 ── */
+.vgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
+.vcard { border: 1px solid var(--border); border-radius: 12px; padding: 12px 12px 6px; background: var(--surface); scroll-margin-top: 80px; }
+.vcard.flash { box-shadow: 0 0 0 3px var(--info); }
+.vcard-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.vcard-head .name { font-weight: 700; font-size: 15px; }
+.vcard-head .grow { flex: 1; }
+.vcard-stats { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--text-dim); margin: 4px 0 2px; }
+.vcard-stats b { font-size: 17px; color: var(--text); }
+.chart.compact .axis { font-size: 10px; }
+.chart.compact .line { stroke-width: 2; }
+@media (max-width: 420px) { .vgrid { grid-template-columns: 1fr; } }
 /* ── 순위 ────────────────────────────── */
 .rank-me { background: var(--info-soft); border-radius: 12px; padding: 10px 14px; margin-bottom: 10px; font-size: 15px; }
 .rank-me b { font-size: 20px; color: var(--info); }
