@@ -5,6 +5,7 @@
     --surface: #fff; --surface-2: #f1f0f5; --border: #e7e5ec; --border-strong: #cbc7d3;
     --text: #19191f; --text-dim: #52505d; --text-faint: #6c6879;
     --accent: #19191f; --accent-text: #fff; --highlight: #e0d4ff;
+    --posting-total: #ffcc80; --posting-today: #bad5fb; --posting-streak: #dfcffb;
     --ok: #247052; --ok-soft: #e2f2e8; --bad: #ad343f; --bad-soft: #fae5e8;
     --warn: #815600; --warn-soft: #fff1d6; --info: #6241a5; --info-soft: #eee7fb;
     --radius: 24px; --shadow: none;
@@ -244,13 +245,17 @@ details.fold > summary { cursor: pointer; color: var(--text-dim); font-weight: 6
 .grid2 > *, .grid3 > * { min-width: 0; }
 #progressCard { background: transparent; padding: 0; }
 #progressCard > h2 { margin-bottom: 16px; }
-.tile { min-width: 0; min-height: 100px; border: 0; border-radius: 22px; padding: 16px; background: #ffcc80; }
-.tile:nth-child(4n+2) { background: #bad5fb; }
-.tile:nth-child(4n+3) { background: #dfcffb; }
+.tile { min-width: 0; min-height: 100px; border: 0; border-radius: 22px; padding: 16px; background: var(--posting-total); }
+.tile:nth-child(4n+2) { background: var(--posting-today); }
+.tile:nth-child(4n+3) { background: var(--posting-streak); }
 .tile:nth-child(4n+4) { background: #f5c6ed; }
 .tile .lbl { color: #48434e; font-size: 12px; }
 .tile .val { margin-top: 10px; font-size: 29px; letter-spacing: -.05em; }
 .prog { border: 0; background: #fff; border-radius: 20px; padding: 16px; }
+#progBlocks .prog:first-child { background: var(--posting-total); }
+#progBlocks .prog:nth-child(2) { background: var(--posting-today); }
+.member-page .cell.done { background: var(--posting-streak); color: var(--text); }
+.member-page .cell.miss { background: var(--surface-2); color: var(--text-faint); }
 .bar { height: 7px; }
 .write-card { background: #fff0d9; }
 .feedback-card { background: #e8efff; }

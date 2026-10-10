@@ -99,8 +99,8 @@ export function progressBlock(title, count, goal, sub) {
 /** 기간 전체 날짜 칸(잔디) */
 export function dayStrip(days, today) {
   return `<div class="strip">${days.map((d) => {
-    const cls = d.future ? 'future' : d.done ? 'done' : 'miss';
-    const t = `${shortDate(d.date)} · ${d.future ? '예정' : `${d.count}개`}`;
+    const cls = d.done ? 'done' : 'miss';
+    const t = `${shortDate(d.date)} · ${d.done ? '포스팅함' : '미등록'} · ${d.count}개`;
     const mmdd = `${d.date.slice(5, 7)}/${d.date.slice(8, 10)}`;
     return `<span class="cell ${cls} ${d.date === today ? 'today' : ''}" title="${esc(t)}" data-tip="${esc(t)}">${mmdd}</span>`;
   }).join('')}</div>`;
