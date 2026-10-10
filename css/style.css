@@ -124,8 +124,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--info); outl
 .mini-bar.done i { background: var(--ok); }
 
 /* ── 날짜 칸(잔디) ───────────────────── */
-.strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(26px, 1fr)); gap: 4px; margin-top: 10px; }
-.cell { aspect-ratio: 1; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; background: var(--bad-soft); color: var(--bad); }
+.strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 4px; margin-top: 10px; }
+.cell { aspect-ratio: 1; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; letter-spacing: -.02em; background: var(--bad-soft); color: var(--bad); cursor: default; }
 .cell.done { background: var(--ok); color: #fff; }
 .cell.part { background: var(--warn-soft); color: var(--warn); }
 .cell.future { background: var(--surface-2); color: var(--text-faint); }
@@ -178,7 +178,28 @@ table.matrix th.today { color: var(--info); }
 .chart .grid { stroke: var(--border); stroke-width: 1; }
 .chart .axis { fill: var(--text-faint); font-size: 11px; }
 .chart .line { fill: none; stroke: var(--info); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
-.chart .dot { fill: var(--surface); stroke: var(--info); stroke-width: 2; }
+.chart .dot { fill: var(--surface); stroke: var(--info); stroke-width: 2; pointer-events: none; }
+.chart .hit { fill: transparent; cursor: pointer; }
+.chart .pt:hover .dot { fill: var(--info); r: 6; }
+.chart .today-line { stroke: var(--info); stroke-width: 1; stroke-dasharray: 3 3; opacity: .6; }
+.chart .axis-today { fill: var(--info); font-weight: 700; }
+.chart .future-area { fill: var(--surface-2); opacity: .7; }
+.chart-tip { position: fixed; z-index: 120; transform: translate(-50%, -100%); background: #0d1b40; color: #fff; font-size: 13px; font-weight: 600;
+  padding: 6px 10px; border-radius: 8px; pointer-events: none; white-space: nowrap; box-shadow: 0 4px 14px rgba(0,0,0,.2); }
+.chart-tip::after { content: ''; position: absolute; left: 50%; bottom: -5px; transform: translateX(-50%); border: 5px solid transparent; border-bottom: 0; border-top-color: #0d1b40; }
+/* ── 순위 ────────────────────────────── */
+.rank-me { background: var(--info-soft); border-radius: 12px; padding: 10px 14px; margin-bottom: 10px; font-size: 15px; }
+.rank-me b { font-size: 20px; color: var(--info); }
+.rank-list { list-style: none; margin: 0; padding: 0; max-height: 420px; overflow-y: auto; }
+.rank-list li { display: grid; grid-template-columns: 36px minmax(70px, 140px) 1fr auto; align-items: center; gap: 10px; padding: 8px 6px; border-bottom: 1px solid var(--border); }
+.rank-list li.me { background: var(--warn-soft); border-radius: 10px; border-bottom-color: transparent; }
+.rank-no { text-align: center; font-weight: 800; font-size: 16px; }
+.rank-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank-bar { height: 8px; background: var(--border); border-radius: 999px; overflow: hidden; }
+.rank-bar i { display: block; height: 100%; background: var(--info); border-radius: 999px; }
+.rank-list li.me .rank-bar i { background: var(--ok); }
+.rank-cnt { font-size: 13px; color: var(--text-dim); white-space: nowrap; }
+.rank-cnt b { font-size: 16px; color: var(--text); }
 .delta.up { color: var(--ok); }
 .delta.down { color: var(--bad); }
 
