@@ -322,28 +322,39 @@ function visitRange() {
 
 function renderVisits() {
   const { from, to } = visitRange();
-  const target = $('#vTarget').value;
-  const visits = target === '__sum' ? S.visits : S.visits.filter((v) => v.uid === target);
-  const series = visitSeries(visits, from, to);
-  const st = seriesStats(series);
-  $('#vTiles').innerHTML = `
-    <div class="tile"><div class="lbl">현재 일방문자수${st.lastDate ? ` <span class="faint">(${shortDate(st.lastDate)})</span>` : ''}</div><div class="val">${st.last == null ? '-' : st.last.toLocaleString()}<small> 명</small></div></div>
-    <div class="tile"><div class="lbl">평균</div><div class="val">${st.avg == null ? '-' : st.avg.toLocaleString()}<small> 명</small></div></div>
-    <div class="tile"><div class="lbl">최고</div><div class="val">${st.max == null ? '-' : st.max.toLocaleString()}<small> 명</small></div></div>`;
-  $('#vChart').innerHTML = lineChart(series, { label: '방문자', today: today() });
-
+  const c = cohort();
+  $('#vPeriod').textContent = c ? `${c.name} · ${shortDate(from)} ~ ${shortDate(to)}` : '';
+  // 챌린지원마다 기간 전체 시계열과 요약값
   const rows = participants().map((p) => {
-    const s = visitSeries(S.visits.filter((v) => v.uid === p.uid), from, to);
-    return Object.assign({ p }, seriesStats(s));
+    const series = visitSeries(S.visits.filter((v) => v.uid === p.uid), from, to);
+    return Object.assign({ p, series }, seriesStats(series));
   });
-  $('#vTable').innerHTML = !rows.length ? '<div class="empty">참여자가 없습니다.</div>' : `
-    <table><thead><tr><th>이름</th><th>블로그</th><th class="num">현재</th><th class="num">평균</th><th class="num">최고</th><th class="num">기록 일수</th><th></th></tr></thead>
-    <tbody>${rows.map((r) => `<tr><td>${esc(r.p.name)}${tag(r.p)}</td>
-      <td>${blogCell(r.p.member)}</td>
-      <td class="num">${r.last == null ? '-' : r.last.toLocaleString()}</td>
-      <td class="num">${r.avg == null ? '-' : r.avg.toLocaleString()}</td><td class="num">${r.max == null ? '-' : r.max.toLocaleString()}</td>
-      <td class="num">${r.n}</td><td><button class="btn sm" type="button" data-vsel="${esc(r.p.uid)}">그래프</button>
-        ${r.p.member && naverBlogId(r.p.member.blogUrl) ? `<button class="btn sm" type="button" data-vsync="${esc(r.p.uid)}" ${S.apiEnabled ? '' : 'disabled'}>🔄</button>` : ''}</td></tr>`).join('')}</tbody></table>`;
+  const sort = $('#vSort').value;
+  const num = (v) => (v == null ? -1 : v);
+  rows.sort((a, b) => (sort === 'name' ? 0 : num(b[sort]) - num(a[sort])) || a.p.name.localeCompare(b.p.name, 'ko'));
+  // "같은 세로 눈금" 이면 모든 그래프의 최댓값을 가장 큰 사람에게 맞춘다
+  const sameMax = $('#vSameScale').checked ? Math.max(0, ...rows.map((r) => r.max || 0)) : 0;
+  const fmt = (v) => (v == null ? '-' : v.toLocaleString());
+
+  $('#vGrid').innerHTML = !rows.length ? '<div class="empty">참여자가 없습니다.</div>' : rows.map((r) => {
+    const naver = r.p.member && naverBlogId(r.p.member.blogUrl);
+    return `
+    <article class="vcard" data-uid="${esc(r.p.uid)}">
+      <div class="vcard-head">
+        <span class="name">${esc(r.p.name)}</span>${tag(r.p)}
+        <span class="grow"></span>
+        ${blogCell(r.p.member)}
+        ${naver ? `<button class="btn sm" type="button" data-vsync="${esc(r.p.uid)}" title="네이버에서 가져오기" ${S.apiEnabled ? '' : 'disabled'}>🔄</button>` : ''}
+      </div>
+      <div class="vcard-stats">
+        <span>현재 <b>${fmt(r.last)}</b>명${r.lastDate ? ` <span class="faint">(${shortDate(r.lastDate)})</span>` : ''}</span>
+        <span>평균 <b>${fmt(r.avg)}</b></span>
+        <span>최고 <b>${fmt(r.max)}</b></span>
+      </div>
+      ${lineChart(r.series, { label: `${r.p.name} 방문자`, today: today(), compact: true, maxValue: sameMax })}
+    </article>`;
+  }).join('');
+
   $('#vSyncAll').disabled = !S.apiEnabled;
   const naverCount = rows.filter((r) => r.p.member && naverBlogId(r.p.member.blogUrl)).length;
   $('#vSyncNote').hidden = false;
@@ -372,23 +383,17 @@ $('#vSyncAll').addEventListener('click', (ev) => busy(ev.currentTarget, async ()
   toast(`${r.ok}/${r.total}명 가져옴`, r.failed.length ? 'bad' : 'ok');
 }, authErrorMessage));
 
-$('#vTarget').addEventListener('change', renderVisits);
-$('#vTable').addEventListener('click', async (ev) => {
+$('#vSort').addEventListener('change', renderVisits);
+$('#vSameScale').addEventListener('change', renderVisits);
+$('#vGrid').addEventListener('click', async (ev) => {
   const sync = ev.target.closest('[data-vsync]');
-  if (sync) {
-    await busy(sync, async () => {
-      const r = await syncNaverVisitors({ uid: sync.dataset.vsync });
-      S.visits = await listVisitsByCohort(S.cohortId);
-      renderVisits();
-      toast(r.ok ? '네이버에서 가져왔습니다.' : syncReport(r), r.ok ? 'ok' : 'bad');
-    }, authErrorMessage);
-    return;
-  }
-  const b = ev.target.closest('[data-vsel]');
-  if (!b) return;
-  $('#vTarget').value = b.dataset.vsel;
-  renderVisits();
-  $('#vChart').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  if (!sync) return;
+  await busy(sync, async () => {
+    const r = await syncNaverVisitors({ uid: sync.dataset.vsync });
+    S.visits = await listVisitsByCohort(S.cohortId);
+    renderVisits();
+    toast(r.ok ? '네이버에서 가져왔습니다.' : syncReport(r), r.ok ? 'ok' : 'bad');
+  }, authErrorMessage);
 });
 
 /* ── 챌린지원 관리 ────────────────────────────────────── */
@@ -671,9 +676,6 @@ function renderSelectors() {
   const keepM = $('#pMember').value;
   $('#pMember').innerHTML = '<option value="">전체</option>' + ps.map((p) => `<option value="${esc(p.uid)}">${esc(p.name)}</option>`).join('');
   $('#pMember').value = ps.some((p) => p.uid === keepM) ? keepM : '';
-  const keepV = $('#vTarget').value;
-  $('#vTarget').innerHTML = '<option value="__sum">전체 합계</option>' + ps.map((p) => `<option value="${esc(p.uid)}">${esc(p.name)}</option>`).join('');
-  $('#vTarget').value = ps.some((p) => p.uid === keepV) ? keepV : '__sum';
 }
 
 function renderAllCohortViews() {
