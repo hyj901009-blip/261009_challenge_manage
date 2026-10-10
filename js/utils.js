@@ -207,10 +207,23 @@ export function validateLoginId(id) {
   return '';
 }
 
+export const MIN_PASSWORD = 4;
+
 export function validatePassword(pw) {
-  if (!pw || String(pw).length < 6) return '비밀번호는 6자 이상이어야 합니다.';
+  if (!pw || String(pw).length < MIN_PASSWORD) return `비밀번호는 ${MIN_PASSWORD}자 이상이어야 합니다.`;
   if (String(pw).length > 64) return '비밀번호가 너무 깁니다. (64자 이하)';
   return '';
+}
+
+/**
+ * 화면에서 입력한 비밀번호 → Firebase 에 실제로 보내는 비밀번호.
+ * Firebase 는 6자 미만 비밀번호를 받지 않으므로, 4~5자(예: 숫자 4자리)는 정해진 글자를 앞뒤에 붙여 늘린다.
+ * 6자 이상은 그대로 보내서, 예전에 6자 이상으로 만든 계정도 그대로 로그인된다.
+ * ⚠️ 이 규칙을 바꾸면 4~5자 비밀번호 계정이 모두 로그인되지 않는다. (서버 API도 같은 함수를 쓴다)
+ */
+export function toAuthPassword(pw) {
+  const s = String(pw == null ? '' : pw);
+  return s.length >= 6 ? s : `bc-pin:${s}:blog`;
 }
 
 /** 블로그 URL 정리 — http(s)만 허용, 스킴이 없으면 https:// 를 붙인다 */

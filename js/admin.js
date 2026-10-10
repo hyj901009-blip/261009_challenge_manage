@@ -396,16 +396,17 @@ $('#vTable').addEventListener('click', async (ev) => {
 });
 
 /* ── 챌린지원 관리 ────────────────────────────────────── */
+/** 숫자 4자리 비밀번호 (0000~9999) */
 function genPassword() {
-  const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
-  const buf = new Uint32Array(8);
+  const buf = new Uint32Array(1);
   crypto.getRandomValues(buf);
-  return Array.from(buf, (n) => chars[n % chars.length]).join('');
+  return String(buf[0] % 10000).padStart(4, '0');
 }
+
 $('#genPw').addEventListener('click', () => { $('#mPw').value = genPassword(); });
 
 function appendHandout(loginId, pw, title = '로그인 안내') {
-  const text = `[${APP.title}] ${title}\n주소: ${location.origin}\n아이디: ${loginId}\n비밀번호: ${pw}\n※ 로그인 후 맨 아래 [비밀번호 변경]에서 바꿀 수 있어요.\n`;
+  const text = `[${APP.title}] ${title}\n주소: ${location.origin}\n아이디: ${loginId}\n비밀번호: ${pw}\n※ 비밀번호를 잊으면 관리자에게 문의해 주세요.\n`;
   const ta = $('#handout');
   ta.value = (ta.value ? ta.value + '\n' : '') + text;
   ta.scrollTop = ta.scrollHeight;
@@ -523,7 +524,7 @@ $('#mTable').addEventListener('click', async (ev) => {
       toast('수정했습니다.', 'ok');
     }, authErrorMessage);
   } else if (btn.hasAttribute('data-mpw')) {
-    const pw = prompt(`${m.loginId} 님의 새 비밀번호 (6자 이상)`, genPassword());
+    const pw = prompt(`${m.loginId} 님의 새 비밀번호 (숫자 4자리 등 4자 이상)`, genPassword());
     if (pw == null) return;
     await busy(btn, async () => {
       await resetPasswordViaApi(m.id, pw);

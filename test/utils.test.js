@@ -79,14 +79,14 @@ test('기간 전/후', () => {
   assert.equal(computeProgress({ startDate: '', endDate: '' }, [], '2026-10-09').valid, false);
 });
 
-test('아이디·비밀번호 검증', () => {
+test('아이디·비밀번호 검증 (4자 이상)', () => {
   assert.equal(normalizeLoginId('  홍길동 '), '홍길동');
   assert.equal(normalizeLoginId('ABC'), 'abc');
   assert.equal(validateLoginId('홍길동'), '');
   assert.equal(validateLoginId('blog_123'), '');
   assert.ok(validateLoginId('홍 길동'));
   assert.ok(validateLoginId('a'));
-  assert.ok(validatePassword('12345'));
+  assert.ok(validatePassword('123'));
   assert.equal(validatePassword('123456'), '');
 });
 
@@ -131,4 +131,14 @@ test('네이버 방문자 XML 파싱', async () => {
 test('순위 — 동점은 같은 등수', () => {
   const r = rankRows([{ name: '다', count: 3 }, { name: '가', count: 5 }, { name: '나', count: 3 }, { name: '라', count: 0 }]);
   assert.deepEqual(r.map((x) => `${x.rank}${x.name}`), ['1가', '2나', '2다', '4라']);
+});
+
+test('4자리 비밀번호 — Firebase 용으로 늘리고, 6자 이상은 그대로', async () => {
+  const { toAuthPassword, validatePassword } = await import('../js/utils.js');
+  assert.equal(validatePassword('1234'), '');
+  assert.ok(validatePassword('123'));
+  assert.ok(toAuthPassword('1234').length >= 6);
+  assert.notEqual(toAuthPassword('1234'), toAuthPassword('5678'));
+  assert.equal(toAuthPassword('hong1234'), 'hong1234');
+  assert.equal(toAuthPassword('123456'), '123456');
 });

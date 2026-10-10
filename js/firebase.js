@@ -28,7 +28,7 @@ import {
   query, where, writeBatch, serverTimestamp, connectFirestoreEmulator
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { FIREBASE_CONFIG, APP } from './config.js';
-import { normalizeLoginId, validateLoginId, validatePassword } from './utils.js';
+import { normalizeLoginId, validateLoginId, validatePassword, toAuthPassword } from './utils.js';
 
 /* ── 초기화 ─────────────────────────────────────────────── */
 /* 로컬 개발: localhost 에서 ?emulator=1 로 열면 Firebase 에뮬레이터(Auth 9099, Firestore 8080)에 붙는다.
@@ -88,7 +88,7 @@ export function authErrorMessage(err) {
   if (/invalid-credential|wrong-password|user-not-found|invalid-email/.test(code)) return '아이디 또는 비밀번호가 올바르지 않습니다.';
   if (/too-many-requests/.test(code)) return '로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.';
   if (/email-already-in-use/.test(code)) return '이미 사용 중인 아이디입니다.';
-  if (/weak-password/.test(code)) return '비밀번호는 6자 이상이어야 합니다.';
+  if (/weak-password/.test(code)) return '비밀번호가 너무 짧습니다. (4자 이상)';
   if (/operation-not-allowed/.test(code)) return 'Firebase 콘솔 [Authentication → 로그인 방법]에서 이메일/비밀번호와 Google 로그인을 사용 설정해 주세요.';
   if (/unauthorized-domain/.test(code)) return '이 도메인이 Firebase 승인된 도메인에 없습니다. [Authentication → 설정 → 승인된 도메인]에 추가해 주세요.';
   if (/popup-closed-by-user|cancelled-popup-request/.test(code)) return '로그인 창이 닫혔습니다.';
@@ -105,7 +105,7 @@ export async function login(loginId, password) {
   const id = normalizeLoginId(loginId);
   const msg = validateLoginId(id);
   if (msg) throw new Error(msg);
-  return signInWithEmailAndPassword(auth, await loginIdToEmail(id), password);
+  return signInWithEmailAndPassword(auth, await loginIdToEmail(id), toAuthPassword(password));
 }
 
 /** 관리자 Google 로그인 */
@@ -158,7 +158,7 @@ async function createAuthAccount(loginId, password) {
   try {
     const secAuth = getAuth(sec);
     if (USE_EMULATOR) connectAuthEmulator(secAuth, 'http://127.0.0.1:9099', { disableWarnings: true });
-    const cred = await createUserWithEmailAndPassword(secAuth, await loginIdToEmail(id), password);
+    const cred = await createUserWithEmailAndPassword(secAuth, await loginIdToEmail(id), toAuthPassword(password));
     await signOut(secAuth);
     return { uid: cred.user.uid, loginId: id };
   } finally {

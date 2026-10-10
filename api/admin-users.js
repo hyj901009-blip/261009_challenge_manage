@@ -9,6 +9,7 @@
  */
 import { getAdmin } from './_lib/firebaseAdmin.js';
 import { isAdminEmail, isAdminToken, verifyCaller, readBody } from './_lib/auth.js';
+import { validatePassword, toAuthPassword } from '../js/utils.js';
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
@@ -34,10 +35,10 @@ export default async function handler(req, res) {
     if (target && isAdminEmail(target.email)) return res.status(400).json({ error: '관리자 계정은 변경할 수 없습니다.' });
 
     if (action === 'resetPassword') {
-      if (typeof password !== 'string' || password.length < 6 || password.length > 64) {
-        return res.status(400).json({ error: '비밀번호는 6~64자여야 합니다.' });
-      }
-      await admin.auth.updateUser(uid, { password });
+      const msg = typeof password === 'string' ? validatePassword(password) : '비밀번호가 필요합니다.';
+      if (msg) return res.status(400).json({ error: msg });
+      // 4~5자 비밀번호는 로그인 화면과 같은 규칙으로 늘려서 저장
+      await admin.auth.updateUser(uid, { password: toAuthPassword(password) });
       return res.status(200).json({ ok: true });
     }
     if (action === 'deleteUser') {
