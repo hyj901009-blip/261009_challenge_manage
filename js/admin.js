@@ -214,7 +214,7 @@ function renderPosts() {
           <b>${esc(nameOf(p.uid))}</b><span class="badge">${esc(POST_TYPE[p.type] || p.type)}</span>${statusBadge(p)}
           <span class="post-meta">${shortDate(p.postDate)} 발행 · ${esc(fmtDateTime(p.createdAt))} 등록</span>
         </div>
-        <div class="post-title" style="margin-top:4px">${esc(p.title || '(제목 없음)')}</div>
+        ${p.title ? `<div class="post-title" style="margin-top:4px">${esc(p.title)}</div>` : ''}
         <a class="post-url" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${esc(p.url)}</a>
         ${p.memo ? `<p class="post-memo">💬 ${esc(p.memo)}</p>` : ''}
         <div class="post-actions">${reviewBtns}
