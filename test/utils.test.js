@@ -32,50 +32,57 @@ test('부분 주는 목표를 비례 배분', () => {
   assert.equal(w.at(-1).to, '2026-10-31');
 });
 
-test('목표값 — 예전 monthly 값은 챌린지 목표로 이어진다', () => {
-  assert.deepEqual(normalizeGoals({ weekly: 3, total: 12 }), { weekly: 3, total: 12 });
-  assert.deepEqual(normalizeGoals({ daily: 1, weekly: 5, monthly: 18 }), { weekly: 5, total: 18 });
-  assert.deepEqual(normalizeGoals({}), { weekly: 5, total: 20 });
+test('목표값 — 미션/자유 따로, 예전 값은 미션 목표로 이어진다', () => {
+  assert.deepEqual(normalizeGoals({ weeklyMission: 3, weeklyFree: 0, totalMission: 12, totalFree: 4 }),
+    { weeklyMission: 3, weeklyFree: 0, totalMission: 12, totalFree: 4 });
+  assert.deepEqual(normalizeGoals({ weekly: 5, total: 18 }), { weeklyMission: 5, weeklyFree: 0, totalMission: 18, totalFree: 0 });
+  assert.deepEqual(normalizeGoals({ daily: 1, weekly: 5, monthly: 18 }), { weeklyMission: 5, weeklyFree: 0, totalMission: 18, totalFree: 0 });
+  assert.deepEqual(normalizeGoals({}), { weeklyMission: 3, weeklyFree: 2, totalMission: 12, totalFree: 8 });
 });
 
-test('진척 계산 — 데일리/위클리/먼슬리, 연속, 달성률', () => {
-  const cohort = { startDate: '2026-10-05', endDate: '2026-11-01', goals: { weekly: 5, total: 20 } };
-  const posts = ['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-08', '2026-10-09', '2026-09-30']
-    .map((postDate) => ({ postDate }));
+test('진척 계산 — 위클리·챌린지 목표를 미션/자유 포스팅으로 따로 센다', () => {
+  const cohort = { startDate: '2026-10-05', endDate: '2026-11-01', goals: { weeklyMission: 3, weeklyFree: 2, totalMission: 12, totalFree: 8 } };
+  const R = (d) => ({ postDate: d, type: 'review' });
+  const F = (d) => ({ postDate: d, type: 'free' });
+  const posts = [R('2026-10-05'), R('2026-10-07'), R('2026-10-08'), F('2026-10-06'), F('2026-10-09'), F('2026-10-12'), R('2026-09-30')];
   const pr = computeProgress(cohort, posts, '2026-10-09');
   assert.equal(pr.valid, true);
   assert.equal(pr.phase, 'running');
   assert.equal(pr.dayNumber, 5);
   assert.equal(pr.totalPosts, 6); // 기간 밖 9/30 제외
-  assert.deepEqual([pr.today.count, pr.today.done], [1, true]);
-  assert.deepEqual([pr.weekly.count, pr.weekly.goal, pr.weekly.done], [6, 5, true]);
-  assert.deepEqual([pr.challenge.count, pr.challenge.goal, pr.challenge.done], [6, 20, false]);
-  assert.equal(pr.goalRate, 30);
-  assert.equal(pr.streak, 5);
-  assert.equal(pr.rate, 100);
+  assert.deepEqual([pr.weekly.index, pr.weekly.mission.count, pr.weekly.mission.goal, pr.weekly.mission.done], [1, 3, 3, true]);
+  assert.deepEqual([pr.weekly.free.count, pr.weekly.free.goal, pr.weekly.free.done, pr.weekly.done], [2, 2, true, true]);
+  assert.deepEqual([pr.weeks[1].free.count, pr.weeks[1].mission.count, pr.weeks[1].done], [1, 0, false]);
+  assert.deepEqual([pr.challenge.mission.count, pr.challenge.mission.goal, pr.challenge.free.count, pr.challenge.free.goal], [3, 12, 3, 8]);
+  assert.equal(pr.challenge.done, false);
+  assert.equal(pr.goalRate, 30); // (3 + 3) / 20
   assert.equal(pr.days.length, 28);
+  assert.equal(pr.days.find((d) => d.date === '2026-10-06').done, true);
 });
 
-test('오늘 아직 안 썼으면 어제까지로 연속·달성률 계산', () => {
-  const cohort = { startDate: '2026-10-05', endDate: '2026-11-01', goals: {} };
-  const posts = ['2026-10-06', '2026-10-07', '2026-10-08'].map((postDate) => ({ postDate }));
+test('진척 — 목표 0 은 목표 없음, 한 종류만 많이 써도 진행률이 넘치지 않음', () => {
+  const cohort = { startDate: '2026-10-05', endDate: '2026-10-11', goals: { weeklyMission: 2, weeklyFree: 0, totalMission: 2, totalFree: 2 } };
+  const posts = ['05', '06', '07', '08'].map((d) => ({ postDate: `2026-10-${d}`, type: 'review' }));
   const pr = computeProgress(cohort, posts, '2026-10-09');
-  assert.equal(pr.today.done, false);
-  assert.equal(pr.streak, 3);
-  assert.equal(pr.elapsedDays, 4);
-  assert.equal(pr.rate, 75);
+  assert.deepEqual([pr.weekly.free.goal, pr.weekly.free.done, pr.weekly.done], [0, true, true]);
+  assert.equal(pr.goalRate, 50); // 미션 2(목표까지만) + 자유 0 / 4
+  assert.equal(pr.challenge.done, false);
+});
+
+test('부분 주는 종류별 목표를 비례 배분', () => {
+  // 2026-10-07(수) ~ 2026-10-31(토): 첫 주 5일
+  const pr = computeProgress({ startDate: '2026-10-07', endDate: '2026-10-31', goals: { weeklyMission: 5, weeklyFree: 2, totalMission: 1, totalFree: 1 } }, [], '2026-10-08');
+  assert.deepEqual([pr.weeks[0].mission.goal, pr.weeks[0].free.goal], [Math.ceil(5 * 5 / 7), Math.ceil(2 * 5 / 7)]);
+  assert.deepEqual([pr.weeks[1].mission.goal, pr.weeks[1].free.goal], [5, 2]);
 });
 
 test('기간 전/후', () => {
   const cohort = { startDate: '2026-11-01', endDate: '2026-11-07', goals: {} };
-  const before = computeProgress(cohort, [], '2026-10-09');
-  assert.equal(before.phase, 'before');
-  assert.equal(before.elapsedDays, 0);
-  assert.equal(before.streak, 0);
-  const after = computeProgress(cohort, [{ postDate: '2026-11-06' }, { postDate: '2026-11-07' }], '2026-12-01');
+  assert.equal(computeProgress(cohort, [], '2026-10-09').phase, 'before');
+  const after = computeProgress(cohort, [{ postDate: '2026-11-06', type: 'free' }], '2026-12-01');
   assert.equal(after.phase, 'after');
-  assert.equal(after.streak, 2);
-  assert.equal(after.elapsedDays, 7);
+  assert.equal(after.weekly.index, 2); // 11/1(일)이 1주차, 11/2~7 이 2주차
+  assert.equal(after.challenge.free.count, 1);
   assert.equal(computeProgress({ startDate: '', endDate: '' }, [], '2026-10-09').valid, false);
 });
 

@@ -96,6 +96,30 @@ export function progressBlock(title, count, goal, sub) {
     </div>`;
 }
 
+/**
+ * 제목 아래에 막대를 여러 줄 — 위클리·챌린지 목표의 "미션 포스팅 / 자유 포스팅" 표시용.
+ * rows: [{ label, count, goal }] — goal 0(목표 없음)인 줄은 숨긴다.
+ */
+export function progressGroup(title, sub, rows) {
+  const shown = rows.filter((r) => r.goal > 0);
+  const done = shown.length > 0 && shown.every((r) => r.count >= r.goal);
+  const line = (r) => {
+    const pct = Math.min(100, Math.round((r.count / r.goal) * 100));
+    const ok = r.count >= r.goal;
+    return `<div class="prog-row ${ok ? 'done' : ''}">
+        <div class="prog-head"><span class="prog-label">${esc(r.label)}</span>
+          <span class="prog-num"><b>${r.count}</b> / ${r.goal}${ok ? ' ✅' : ''}</span></div>
+        <div class="bar"><i style="width:${pct}%"></i></div>
+      </div>`;
+  };
+  return `
+    <div class="prog prog-group ${done ? 'done' : ''}">
+      <div class="prog-title">${esc(title)}${done ? ' <span class="badge ok">달성</span>' : ''}</div>
+      ${shown.length ? shown.map(line).join('') : '<div class="prog-sub">설정된 목표가 없습니다.</div>'}
+      ${sub ? `<div class="prog-sub">${esc(sub)}</div>` : ''}
+    </div>`;
+}
+
 /** 기간 전체 날짜 칸(잔디) */
 export function dayStrip(days, today) {
   return `<div class="strip">${days.map((d) => {
