@@ -67,8 +67,8 @@ service cloud.firestore {
 
     match /comments/{commentId} {
       allow read: if isAdmin() || (signedIn() && resource.data.memberUid == uid());
-      allow create: if isAdmin() && isStr(request.resource.data.text, 500) && request.resource.data.text.size() > 0;
-      allow update: if (isAdmin() && isStr(request.resource.data.text, 500))
+      allow create: if isAdmin() && isStr(request.resource.data.text, 1000) && request.resource.data.text.size() > 0;
+      allow update: if (isAdmin() && isStr(request.resource.data.text, 1000))
         // 챌린지원은 "확인/반응"만 남길 수 있다 (반응 목록은 js/config.js 의 APP.reactions 와 맞춘다)
         || (signedIn() && resource.data.memberUid == uid()
             && changedOnly(['reaction', 'readAt'])
