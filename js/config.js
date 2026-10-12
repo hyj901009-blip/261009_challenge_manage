@@ -33,7 +33,7 @@ export const APP = {
   // 미션 포스팅(검토 요청) / 자유 포스팅(자유 등록)을 따로 센다. weekly*: 주당, total*: 챌린지 기간 전체. 0 = 목표 없음
   defaultGoals: { weeklyMission: 3, weeklyFree: 2, totalMission: 12, totalFree: 8 },
 
-  commentMaxLength: 500,
+  commentMaxLength: 1000, // ⚠️ firestore.rules 의 comments 글자 수 제한(1000)과 맞춘다
 
   // 챌린지원이 관리자 코멘트에 남길 수 있는 반응
   reactions: [
