@@ -120,6 +120,14 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--info); outl
 .bar i { display: block; height: 100%; background: var(--info); border-radius: 999px; transition: width 0.4s; }
 .prog.done .bar i { background: var(--ok); }
 .prog-sub { font-size: 12px; color: var(--text-faint); }
+.goal-grid { display: grid; grid-template-columns: auto 1fr 1fr; gap: 8px 10px; align-items: center; margin: 12px 0 4px; }
+.goal-grid b { font-size: 14px; line-height: 1.3; }
+.goal-grid > b:nth-child(2), .goal-grid > b:nth-child(3) { text-align: center; }
+.prog-group .prog-title { margin-bottom: 4px; }
+.prog-row { margin-top: 8px; }
+.prog-label { font-size: 14px; font-weight: 600; color: var(--text-dim); }
+.prog-row .prog-num b { font-size: 18px; }
+.prog-row.done .bar i { background: var(--ok); }
 .mini-bar { display: inline-block; width: 60px; height: 6px; background: var(--border); border-radius: 999px; overflow: hidden; vertical-align: middle; margin-left: 6px; }
 .mini-bar i { display: block; height: 100%; background: var(--info); }
 .mini-bar.done i { background: var(--ok); }

@@ -71,13 +71,18 @@ function miniBar(count, goal) {
   return `<span class="mini-bar ${count >= goal ? 'done' : ''}"><i style="width:${pct}%"></i></span>`;
 }
 
+/** "개수/목표 + 막대" — 목표가 0(목표 없음)이면 개수만 */
+function tallyCell(t) {
+  return t.goal > 0 ? `${t.count}/${t.goal}${miniBar(t.count, t.goal)}` : `<span class="faint">${t.count}</span>`;
+}
+
 function renderProgress() {
   const c = cohort();
   if (!c) { $('#progTiles').innerHTML = ''; $('#progTable').innerHTML = '<div class="empty">기수를 먼저 만들어 주세요.</div>'; $('#matrix').innerHTML = ''; return; }
   const rows = progressRows();
   const ref = $('#refDate').value || today();
   const g = normalizeGoals(c.goals);
-  $('#periodText').textContent = `${c.name} · ${shortDate(c.startDate)} ~ ${shortDate(c.endDate)} · 목표 주 ${g.weekly}개 / 챌린지 ${g.total}개`;
+  $('#periodText').textContent = `${c.name} · ${shortDate(c.startDate)} ~ ${shortDate(c.endDate)} · 위클리 미션 ${g.weeklyMission}·자유 ${g.weeklyFree} / 챌린지 미션 ${g.totalMission}·자유 ${g.totalFree}`;
 
   const valid = rows.filter((r) => r.pr.valid);
   const n = valid.length;
@@ -102,7 +107,7 @@ function renderProgress() {
     return a.name.localeCompare(b.name, 'ko');
   });
   $('#progTable').innerHTML = !sorted.length ? '<div class="empty">아직 이 기수에 챌린지원이 없습니다.</div>' : `
-    <table><thead><tr><th class="num">순위</th><th>이름</th><th>위클리</th><th>챌린지 목표</th><th class="num">진행률</th><th>검토</th></tr></thead>
+    <table><thead><tr><th class="num">순위</th><th>이름</th><th>위클리 미션</th><th>위클리 자유</th><th>챌린지 미션</th><th>챌린지 자유</th><th class="num">진행률</th><th>검토</th></tr></thead>
     <tbody>${sorted.map((r) => {
       const pr = r.pr;
       const mine = S.posts.filter((p) => p.uid === r.uid);
@@ -110,8 +115,10 @@ function renderProgress() {
       return `<tr>
         <td class="num"><b>${rankOf.get(r.uid)}</b></td>
         <td><b>${esc(r.name)}</b> <span class="faint">${esc(r.loginId)}</span>${tag(r)}</td>
-        <td>${pr.weekly.count}/${pr.weekly.goal}${miniBar(pr.weekly.count, pr.weekly.goal)}</td>
-        <td>${pr.challenge.count}/${pr.challenge.goal}${miniBar(pr.challenge.count, pr.challenge.goal)}</td>
+        <td>${tallyCell(pr.weekly.mission)}</td>
+        <td>${tallyCell(pr.weekly.free)}</td>
+        <td>${tallyCell(pr.challenge.mission)}</td>
+        <td>${tallyCell(pr.challenge.free)}</td>
         <td class="num">${pr.goalRate}%</td>
         <td>${pend ? `<span class="badge warn">대기 ${pend}</span>` : ''}</td></tr>`;
     }).join('')}</tbody></table>`;
@@ -135,7 +142,10 @@ function renderMatrix(rows, ref) {
     head = cols.map((w) => `<th title="${esc(shortDate(w.from))}~${esc(shortDate(w.to))}">${w.index}주</th>`).join('');
     body = rows.map((r) => `<tr><td>${esc(r.name)}</td>${r.pr.weeks.map((w) => {
       const fut = w.from > ref;
-      return `<td><span class="m ${cls(w.count, w.goal, fut)}" style="width:auto;padding:0 6px">${fut ? '-' : `${w.count}/${w.goal}`}</span></td>`;
+      // 미션·자유 둘 다 달성이면 초록, 하나라도 썼으면 노랑
+      const state = fut ? 'future' : w.done ? 'done' : (w.mission.count + w.free.count) ? 'part' : 'miss';
+      const txt = (t) => (t.goal > 0 ? `${t.count}/${t.goal}` : `${t.count}`);
+      return `<td><span class="m ${state}" style="width:auto;padding:0 6px" title="미션 ${txt(w.mission)} · 자유 ${txt(w.free)}">${fut ? '-' : `미 ${txt(w.mission)} · 자 ${txt(w.free)}`}</span></td>`;
     }).join('')}</tr>`).join('');
   }
   $('#matrix').innerHTML = `<table class="matrix"><thead><tr><th>이름</th>${head}</tr></thead><tbody>${body}</tbody></table>`;
@@ -564,8 +574,10 @@ function fillCohortForms() {
     $('#cName').value = c.name || '';
     $('#cStart').value = c.startDate || '';
     $('#cEnd').value = c.endDate || '';
-    $('#cWeekly').value = g.weekly;
-    $('#cTotal').value = g.total;
+    $('#cWeeklyMission').value = g.weeklyMission;
+    $('#cWeeklyFree').value = g.weeklyFree;
+    $('#cTotalMission').value = g.totalMission;
+    $('#cTotalFree').value = g.totalFree;
     const active = c.id === S.meta.activeCohortId;
     $('#activeMark').innerHTML = active ? '<span class="badge ok">활성 기수</span>' : '<span class="badge">비활성</span>';
     $('#cActivate').hidden = active;
@@ -576,8 +588,10 @@ function fillCohortForms() {
   $('#nName').value = `${S.cohorts.length + 1}기`;
   $('#nStart').value = start;
   $('#nEnd').value = addDays(start, 27);
-  $('#nWeekly').value = g.weekly;
-  $('#nTotal').value = g.total;
+  $('#nWeeklyMission').value = g.weeklyMission;
+  $('#nWeeklyFree').value = g.weeklyFree;
+  $('#nTotalMission').value = g.totalMission;
+  $('#nTotalFree').value = g.totalFree;
   $('#nMove').parentElement.hidden = !c;
   $('#wipeBtn').disabled = !c;
   $('#delCohortBtn').disabled = !c;
@@ -588,11 +602,15 @@ function readCohortForm(p) {
     name: $(`#${p}Name`).value.trim().slice(0, 30),
     startDate: $(`#${p}Start`).value,
     endDate: $(`#${p}End`).value,
-    goals: normalizeGoals({ weekly: $(`#${p}Weekly`).value, total: $(`#${p}Total`).value })
+    goals: normalizeGoals({
+      weeklyMission: $(`#${p}WeeklyMission`).value, weeklyFree: $(`#${p}WeeklyFree`).value,
+      totalMission: $(`#${p}TotalMission`).value, totalFree: $(`#${p}TotalFree`).value
+    })
   };
   if (!data.name) throw new Error('기수 이름을 입력해 주세요.');
   if (!isISODate(data.startDate) || !isISODate(data.endDate)) throw new Error('시작일과 종료일을 입력해 주세요.');
   if (data.startDate > data.endDate) throw new Error('종료일이 시작일보다 빠릅니다.');
+  if (!Object.values(data.goals).some((v) => v > 0)) throw new Error('목표를 하나 이상 1개 이상으로 입력해 주세요.');
   return data;
 }
 

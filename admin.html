@@ -182,11 +182,16 @@
               <label class="field grow"><span>시작일</span><input type="date" id="cStart" required></label>
               <label class="field grow"><span>종료일</span><input type="date" id="cEnd" required></label>
             </div>
-            <div class="row" style="margin-top:10px">
-              <label class="field grow"><span>위클리 목표 (개/주)</span><input type="number" id="cWeekly" min="1" required></label>
-              <label class="field grow"><span>챌린지 목표 (개)</span><input type="number" id="cTotal" min="1" required></label>
+            <div class="goal-grid">
+              <span></span><b>📝 미션 포스팅<br><small class="faint">검토 요청</small></b><b>🚀 자유 포스팅<br><small class="faint">자유 등록</small></b>
+              <b>위클리 목표<br><small class="faint">개/주</small></b>
+              <input type="number" id="cWeeklyMission" min="0" required aria-label="위클리 미션 포스팅 목표">
+              <input type="number" id="cWeeklyFree" min="0" required aria-label="위클리 자유 포스팅 목표">
+              <b>챌린지 목표<br><small class="faint">기간 전체 개수</small></b>
+              <input type="number" id="cTotalMission" min="0" required aria-label="챌린지 미션 포스팅 목표">
+              <input type="number" id="cTotalFree" min="0" required aria-label="챌린지 자유 포스팅 목표">
             </div>
-            <p class="faint">챌린지 목표는 기간 전체 동안 올릴 포스팅 개수입니다. 기간에 일부만 걸친 주는 걸친 날 수만큼 위클리 목표가 비례해서 줄어듭니다.</p>
+            <p class="faint">미션 포스팅은 챌린지원이 <b>검토 요청</b>으로 올린 글, 자유 포스팅은 <b>자유 등록</b>으로 올린 글을 셉니다. 0 으로 두면 그 종류는 목표 없음입니다. 기간에 일부만 걸친 주는 걸친 날 수만큼 위클리 목표가 비례해서 줄어듭니다.</p>
             <div class="row">
               <button class="btn primary" id="cSave" type="submit">저장</button>
               <button class="btn" id="cActivate" type="button">챌린지원에게 보이는 활성 기수로 지정</button>
@@ -203,9 +208,14 @@
               <label class="field grow"><span>시작일</span><input type="date" id="nStart" required></label>
               <label class="field grow"><span>종료일</span><input type="date" id="nEnd" required></label>
             </div>
-            <div class="row" style="margin-top:10px">
-              <label class="field grow"><span>위클리 목표 (개/주)</span><input type="number" id="nWeekly" min="1" required></label>
-              <label class="field grow"><span>챌린지 목표 (개)</span><input type="number" id="nTotal" min="1" required></label>
+            <div class="goal-grid">
+              <span></span><b>📝 미션 포스팅<br><small class="faint">검토 요청</small></b><b>🚀 자유 포스팅<br><small class="faint">자유 등록</small></b>
+              <b>위클리 목표<br><small class="faint">개/주</small></b>
+              <input type="number" id="nWeeklyMission" min="0" required aria-label="위클리 미션 포스팅 목표">
+              <input type="number" id="nWeeklyFree" min="0" required aria-label="위클리 자유 포스팅 목표">
+              <b>챌린지 목표<br><small class="faint">기간 전체 개수</small></b>
+              <input type="number" id="nTotalMission" min="0" required aria-label="챌린지 미션 포스팅 목표">
+              <input type="number" id="nTotalFree" min="0" required aria-label="챌린지 자유 포스팅 목표">
             </div>
             <label class="faint" style="display:block;margin-top:10px"><input type="checkbox" id="nActivate" checked> 만들자마자 활성 기수로 지정</label>
             <label class="faint" style="display:block"><input type="checkbox" id="nMove"> 지금 보고 있는 기수의 챌린지원을 새 기수로 옮기기 (계정 유지)</label>

@@ -66,13 +66,29 @@ export function shortDate(iso) {
 const maxDate = (a, b) => (a > b ? a : b);
 const minDate = (a, b) => (a < b ? a : b);
 
-/** 목표값 정리 — 비었거나 이상한 값은 기본값으로.
- *  weekly: 주당 목표 개수 / total: 챌린지 기간 전체 목표 개수
- *  (예전 기수 데이터의 monthly 값은 챌린지 목표로 이어서 쓴다) */
+/** 목표값 정리 — 미션 포스팅(검토 요청)과 자유 포스팅(자유 등록)을 따로 센다.
+ *  weeklyMission / weeklyFree : 주당 목표 개수
+ *  totalMission  / totalFree  : 챌린지 기간 전체 목표 개수
+ *  0 은 "목표 없음"(그 종류는 세지 않음). 예전 기수(weekly/total/monthly 하나만 있던 값)는 미션 목표로 이어 쓴다. */
+export const DEFAULT_GOALS = { weeklyMission: 3, weeklyFree: 2, totalMission: 12, totalFree: 8 };
+
 export function normalizeGoals(goals = {}) {
-  const pick = (v, d) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Math.floor(Number(v)) : d);
-  return { weekly: pick(goals.weekly, 5), total: pick(goals.total != null ? goals.total : goals.monthly, 20) };
+  const g = goals || {};
+  const num = (v, d) => (v !== '' && v != null && Number.isFinite(Number(v)) && Number(v) >= 0 ? Math.floor(Number(v)) : d);
+  const isNew = ['weeklyMission', 'weeklyFree', 'totalMission', 'totalFree'].some((k) => g[k] != null);
+  if (!isNew && (g.weekly != null || g.total != null || g.monthly != null)) {
+    return { weeklyMission: num(g.weekly, 5), weeklyFree: 0, totalMission: num(g.total != null ? g.total : g.monthly, 20), totalFree: 0 };
+  }
+  return {
+    weeklyMission: num(g.weeklyMission, DEFAULT_GOALS.weeklyMission),
+    weeklyFree: num(g.weeklyFree, DEFAULT_GOALS.weeklyFree),
+    totalMission: num(g.totalMission, DEFAULT_GOALS.totalMission),
+    totalFree: num(g.totalFree, DEFAULT_GOALS.totalFree)
+  };
 }
+
+/** 글 종류: 검토 요청 = 미션 포스팅, 자유 등록 = 자유 포스팅 */
+export const postKind = (p) => (p && p.type === 'review' ? 'mission' : 'free');
 
 /** 날짜별 포스팅 수 { 'YYYY-MM-DD': n } — 기간 밖 날짜는 집계하지 않는다 */
 export function countByDate(posts, start, end) {
@@ -93,9 +109,9 @@ function sumRange(counts, from, to) {
   return n;
 }
 
-/** 기간에 일부만 걸친 주는 걸친 일수만큼 목표를 비례 배분(올림) */
+/** 기간에 일부만 걸친 주는 걸친 일수만큼 목표를 비례 배분(올림). 목표 0 은 0 그대로 */
 function proratedGoal(goal, daysInside, daysTotal) {
-  return Math.max(1, Math.ceil(goal * daysInside / daysTotal));
+  return goal > 0 ? Math.max(1, Math.ceil(goal * daysInside / daysTotal)) : 0;
 }
 
 /** 기간을 주(월~일) 단위로 자른 목록 */
@@ -109,12 +125,15 @@ export function periodWeeks(start, end, weeklyGoal) {
   return out;
 }
 
+/** { count, goal, done } — 목표 0 이면 "목표 없음"으로 보고 달성으로 친다 */
+const tally = (count, goal) => ({ count, goal, done: goal <= 0 || count >= goal });
+
 /**
  * 한 사람의 미션 진척을 계산한다.
- * @param cohort { startDate, endDate, goals:{weekly,total} }
- * @param posts  [{ postDate }]
+ * @param cohort { startDate, endDate, goals:{weeklyMission, weeklyFree, totalMission, totalFree} }
+ * @param posts  [{ postDate, type }]  type: 'review'(미션) | 'free'(자유)
  * @param today  기준일 'YYYY-MM-DD'
- * "포스팅한 날" = 그날 글이 1개 이상인 날 (날짜 칸·연속·참여율 계산에 쓴다)
+ * 위클리·챌린지 목표 모두 미션 포스팅과 자유 포스팅을 따로 센다.
  */
 export function computeProgress(cohort, posts, today) {
   const goals = normalizeGoals(cohort && cohort.goals);
@@ -123,36 +142,34 @@ export function computeProgress(cohort, posts, today) {
   if (!isISODate(start) || !isISODate(end) || start > end) {
     return { valid: false, goals };
   }
-  const counts = countByDate(posts, start, end);
+  const list = posts || [];
+  const counts = countByDate(list, start, end);
+  const byKind = {
+    mission: countByDate(list.filter((p) => postKind(p) === 'mission'), start, end),
+    free: countByDate(list.filter((p) => postKind(p) === 'free'), start, end)
+  };
   const phase = today < start ? 'before' : today > end ? 'after' : 'running';
   // 기간 밖이면 가장 가까운 기간 안 날짜를 기준으로 보여 준다
   const ref = today < start ? start : today > end ? end : today;
   const posted = (d) => (counts[d] || 0) > 0;
 
-  const todayInfo = { date: ref, count: counts[ref] || 0, done: posted(ref) };
-
-  const weeks = periodWeeks(start, end, goals.weekly).map((w) => {
-    const count = sumRange(counts, w.from, w.to);
-    return Object.assign(w, { count, done: count >= w.goal });
+  const weeks = periodWeeks(start, end, 7).map((w) => {
+    const days = diffDays(w.from, w.to) + 1;
+    const mission = tally(sumRange(byKind.mission, w.from, w.to), proratedGoal(goals.weeklyMission, days, 7));
+    const free = tally(sumRange(byKind.free, w.from, w.to), proratedGoal(goals.weeklyFree, days, 7));
+    return { index: w.index, from: w.from, to: w.to, mission, free, done: mission.done && free.done };
   });
   const weekly = weeks.find((w) => w.from <= ref && ref <= w.to);
 
-  const totalPosts = Object.values(counts).reduce((a, b) => a + b, 0);
-  const challenge = { from: start, to: end, count: totalPosts, goal: goals.total, done: totalPosts >= goals.total };
+  const sumAll = (m) => Object.values(m).reduce((a, b) => a + b, 0);
+  const cMission = tally(sumAll(byKind.mission), goals.totalMission);
+  const cFree = tally(sumAll(byKind.free), goals.totalFree);
+  const challenge = { from: start, to: end, mission: cMission, free: cFree, done: cMission.done && cFree.done };
+  const totalPosts = sumAll(counts);
 
-  // 지난 날짜 + (오늘 이미 썼다면 오늘) 을 분모로 — 아침마다 참여율이 뚝 떨어지지 않게
-  let elapsedEnd = null;
-  if (phase === 'after') elapsedEnd = end;
-  else if (phase === 'running') elapsedEnd = todayInfo.done ? today : addDays(today, -1);
-  const elapsedDays = elapsedEnd && elapsedEnd >= start ? dateRange(start, elapsedEnd) : [];
-  const postedDays = elapsedDays.filter(posted).length;
-
-  // 연속 포스팅: 오늘 썼으면 오늘부터, 아니면 어제부터 거꾸로
-  let streak = 0;
-  if (phase !== 'before') {
-    let cur = phase === 'after' ? end : (todayInfo.done ? today : addDays(today, -1));
-    while (cur >= start && posted(cur)) { streak++; cur = addDays(cur, -1); }
-  }
+  // 챌린지 목표 진행률: 종류별로 목표까지만 채운 개수 / 목표 합 (한 종류만 많이 써서 100% 가 되지 않게)
+  const goalSum = goals.totalMission + goals.totalFree;
+  const goalRate = goalSum ? Math.round(((Math.min(cMission.count, goals.totalMission) + Math.min(cFree.count, goals.totalFree)) / goalSum) * 100) : 0;
 
   const days = dateRange(start, end).map((d) => ({
     date: d,
@@ -168,17 +185,12 @@ export function computeProgress(cohort, posts, today) {
     goals,
     totalDays: days.length,
     dayNumber: phase === 'running' ? diffDays(start, today) + 1 : null,
-    today: todayInfo,
     weekly,
     weeks,
     challenge,
     days,
     totalPosts,
-    postedDays,
-    elapsedDays: elapsedDays.length,
-    rate: elapsedDays.length ? Math.round((postedDays / elapsedDays.length) * 100) : 0,
-    goalRate: Math.min(100, Math.round((totalPosts / goals.total) * 100)),
-    streak
+    goalRate
   };
 }
 

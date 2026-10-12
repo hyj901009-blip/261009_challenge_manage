@@ -9,7 +9,7 @@ import {
   todayISO, addDays, computeProgress, shortDate, normalizeUrl, isISODate, visitSeries, seriesStats, diffDays, naverBlogId, rankRows
 } from './utils.js';
 import {
-  $, $$, esc, toast, busy, requireRole, progressBlock, dayStrip, lineChart, statusBadge, fmtDateTime,
+  $, $$, esc, toast, busy, requireRole, progressGroup, dayStrip, lineChart, statusBadge, fmtDateTime,
   tsMillis, reactionOf, POST_TYPE, installTooltips, fmtTime
 } from './ui.js';
 
@@ -40,14 +40,23 @@ function renderProgress() {
     : pr.phase === 'after' ? '미션 종료' : `${pr.dayNumber}일차 / ${pr.totalDays}일`;
   $('#periodText').textContent = `${shortDate(c.startDate)} ~ ${shortDate(c.endDate)} · ${phaseText}`;
 
+  const w = pr.weekly;
+  const ch = pr.challenge;
   $('#progBlocks').innerHTML =
-    progressBlock(`위클리 · ${pr.weekly.index}주차`, pr.weekly.count, pr.weekly.goal, `${shortDate(pr.weekly.from)} ~ ${shortDate(pr.weekly.to)} · 주 ${pr.goals.weekly}개 목표`) +
-    progressBlock('챌린지 목표', pr.challenge.count, pr.challenge.goal, `${shortDate(pr.challenge.from)} ~ ${shortDate(pr.challenge.to)} · 전체 기간`);
+    progressGroup(`위클리 · ${w.index}주차`, `${shortDate(w.from)} ~ ${shortDate(w.to)}`, [
+      { label: '📝 미션 포스팅 (검토 요청)', count: w.mission.count, goal: w.mission.goal },
+      { label: '🚀 자유 포스팅', count: w.free.count, goal: w.free.goal }
+    ]) +
+    progressGroup('챌린지 목표', `${shortDate(ch.from)} ~ ${shortDate(ch.to)} · 전체 기간`, [
+      { label: '📝 미션 포스팅 (검토 요청)', count: ch.mission.count, goal: ch.mission.goal },
+      { label: '🚀 자유 포스팅', count: ch.free.count, goal: ch.free.goal }
+    ]);
 
   $('#strip').innerHTML = dayStrip(pr.days, t);
-  $('#weekTable').innerHTML = `<table><thead><tr><th>주차</th><th>기간</th><th class="num">달성</th></tr></thead><tbody>${
-    pr.weeks.map((w) => `<tr><td>${w.index}주차</td><td>${shortDate(w.from)}~${shortDate(w.to)}</td>
-      <td class="num">${w.count}/${w.goal} ${w.done ? '✅' : ''}</td></tr>`).join('')}</tbody></table>`;
+  const cell = (x) => (x.goal > 0 ? `${x.count}/${x.goal}` : `${x.count}`);
+  $('#weekTable').innerHTML = `<table><thead><tr><th>주차</th><th>기간</th><th class="num">미션</th><th class="num">자유</th><th></th></tr></thead><tbody>${
+    pr.weeks.map((wk) => `<tr><td>${wk.index}주차</td><td>${shortDate(wk.from)}~${shortDate(wk.to)}</td>
+      <td class="num">${cell(wk.mission)}</td><td class="num">${cell(wk.free)}</td><td>${wk.done ? '✅' : ''}</td></tr>`).join('')}</tbody></table>`;
 }
 
 /* ── 순위 ─────────────────────────────────────────────── */
