@@ -1,7 +1,7 @@
 /* 화면 공통 도우미 — 이스케이프, 토스트, 진행 막대, 방문자 추이 SVG 차트, 페이지 접근 제어 */
 import { APP } from './config.js';
 import { currentUser, getRole, ready } from './firebase.js';
-import { shortDate } from './utils.js';
+import { shortDate, niceAxisMax, axisTicks } from './utils.js';
 
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -147,8 +147,7 @@ export function lineChart(series, { height, label = '방문자', today = '', com
   const H = height || (compact ? 190 : 240);
   const pad = compact ? { l: 40, r: 12, t: 18, b: 28 } : { l: 48, r: 16, t: 18, b: 36 };
   const maxV = Math.max(maxValue || 0, vals.length ? Math.max(...vals.map((p) => p.v)) : 0);
-  const mag = maxV > 0 ? Math.pow(10, Math.floor(Math.log10(maxV))) : 1;
-  const niceMax = maxV <= 5 ? 5 : Math.ceil(maxV / mag) * mag;
+  const niceMax = niceAxisMax(maxV); // 최고값이 그래프 높이의 약 90%
   const x = (i) => pad.l + (pts.length === 1 ? (W - pad.l - pad.r) / 2 : (i * (W - pad.l - pad.r)) / (pts.length - 1));
   const y = (v) => pad.t + (H - pad.t - pad.b) * (1 - v / niceMax);
 
@@ -160,8 +159,7 @@ export function lineChart(series, { height, label = '방문자', today = '', com
   }
   if (cur.length) segs.push(cur);
 
-  const grid = [0, 0.25, 0.5, 0.75, 1].map((f) => {
-    const v = Math.round(niceMax * f);
+  const grid = axisTicks(niceMax).map((v) => {
     return `<line x1="${pad.l}" x2="${W - pad.r}" y1="${y(v)}" y2="${y(v)}" class="grid"/>
       <text x="${pad.l - 8}" y="${y(v) + 4}" class="axis" text-anchor="end">${v.toLocaleString()}</text>`;
   }).join('');
@@ -211,14 +209,12 @@ export function renderMultiLineChart(el, series, { today = '', hidden = new Set(
   const pad = { l: 52, r: 18, t: 22, b: 38 };
   const allVals = shown.flatMap((s) => s.points.map((p) => p.value).filter((v) => v != null));
   const maxV = allVals.length ? Math.max(...allVals) : 0;
-  const mag = maxV > 0 ? Math.pow(10, Math.floor(Math.log10(maxV))) : 1;
-  const niceMax = maxV <= 5 ? 5 : Math.ceil(maxV / mag) * mag;
+  const niceMax = niceAxisMax(maxV); // 최고값이 그래프 높이의 약 90%
   const x = (i) => pad.l + (dates.length === 1 ? (W - pad.l - pad.r) / 2 : (i * (W - pad.l - pad.r)) / (dates.length - 1));
   const y = (v) => pad.t + (H - pad.t - pad.b) * (1 - v / niceMax);
   const colW = dates.length > 1 ? x(1) - x(0) : W;
 
-  const grid = [0, 0.25, 0.5, 0.75, 1].map((f) => {
-    const v = Math.round(niceMax * f);
+  const grid = axisTicks(niceMax).map((v) => {
     return `<line x1="${pad.l}" x2="${W - pad.r}" y1="${y(v)}" y2="${y(v)}" class="grid"/>
       <text x="${pad.l - 8}" y="${y(v) + 4}" class="axis" text-anchor="end">${v.toLocaleString()}</text>`;
   }).join('');

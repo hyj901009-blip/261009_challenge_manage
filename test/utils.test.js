@@ -149,3 +149,18 @@ test('4자리 비밀번호 — Firebase 용으로 늘리고, 6자 이상은 그�
   assert.equal(toAuthPassword('hong1234'), 'hong1234');
   assert.equal(toAuthPassword('123456'), '123456');
 });
+
+test('그래프 세로축 — 최고값이 약 90% 높이에 오게', async () => {
+  const { niceAxisMax, axisTicks } = await import('../js/utils.js');
+  for (const [max, want] of [[1400, 1600], [1500, 1700], [130, 150], [260, 290], [90, 100], [42, 47], [0, 5], [2000, 2300]]) {
+    assert.equal(niceAxisMax(max), want, `최고 ${max}`);
+  }
+  for (const max of [7, 42, 55, 130, 260, 333, 990, 1234, 1400, 1500, 2000, 98765]) {
+    const pct = max / niceAxisMax(max);
+    assert.ok(pct <= 0.9 + 1e-9 && pct >= 0.8, `최고 ${max} → ${niceAxisMax(max)} (${Math.round(pct * 100)}%)`);
+    const t = axisTicks(niceAxisMax(max));
+    assert.ok(t[0] === 0 && t.length >= 3 && t.length <= 6 && t.at(-1) <= niceAxisMax(max), `눈금 ${t}`);
+  }
+  assert.deepEqual(axisTicks(1600), [0, 500, 1000, 1500]);
+  assert.deepEqual(axisTicks(150), [0, 50, 100, 150]);
+});
