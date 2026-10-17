@@ -252,6 +252,28 @@ export function normalizeUrl(raw) {
   }
 }
 
+/**
+ * 그래프 세로축 최댓값 — 최고값이 그래프 높이의 약 90%에 오게 한다(위쪽 여유 약 10%).
+ * 최고값 ÷ 0.9 를 두 번째 자리에서 올림해서, 최고값은 늘 높이의 약 85~90% 에 온다.
+ * 예) 최고 1,400 → 1,600   최고 1,500 → 1,700   최고 130 → 150   최고 0 → 5
+ */
+export function niceAxisMax(maxValue, fill = 0.9) {
+  const target = Math.max(0, Number(maxValue) || 0) / fill;
+  if (target <= 5) return 5;
+  const unit = Math.max(1, Math.pow(10, Math.floor(Math.log10(target)) - 1)); // 방문자 수는 정수
+  return Math.round(Math.ceil(target / unit - 1e-9) * unit);
+}
+
+/** 세로축 눈금 값 — 0 부터 1·2·2.5·5 × 10ⁿ 간격으로, 최댓값을 넘지 않게 3~6줄 */
+export function axisTicks(max) {
+  const raw = max / 5;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map((k) => k * mag).find((v) => v >= raw - 1e-9);
+  const out = [];
+  for (let v = 0; v <= max + 1e-9; v += step) out.push(Math.round(v * 1e6) / 1e6);
+  return out;
+}
+
 /** 방문자 기록 [{date,count}] → 기간 안의 연속 시계열(빈 날은 null) */
 export function visitSeries(visits, from, to) {
   const map = {};
